@@ -1,13 +1,13 @@
-// Parser + evaluator + silent tests
+// Parser + evaluator + silent tests (unchanged core)
 export class ParseError extends Error{ constructor(msg){ super(msg); this.name='ParseError'; } }
 export const OP = {
-  NOT: {prec:5, assoc:'right', arity:1},
-  AND: {prec:4, assoc:'left',  arity:2},
-  OR:  {prec:2, assoc:'left',  arity:2},
-  XOR: {prec:3, assoc:'left',  arity:2}, // supported, no chip by default
+  NOT:{prec:5, assoc:'right', arity:1},
+  AND:{prec:4, assoc:'left',  arity:2},
+  XOR:{prec:3, assoc:'left',  arity:2},
+  OR: {prec:2, assoc:'left',  arity:2},
   IMPLIES:{prec:1, assoc:'right', arity:2},
-  IFF: {prec:0, assoc:'right', arity:2},
-  DIFF:{prec:4, assoc:'left',  arity:2}
+  IFF:{prec:0, assoc:'right', arity:2},
+  DIFF:{prec:4, assoc:'left',  arity:2},
 };
 export function normalizeExpr(s){
   return s.replace(/→/g,'->').replace(/↔/g,'<->').replace(/[\u200B-\u200D\uFEFF]/g,'');
@@ -15,13 +15,12 @@ export function normalizeExpr(s){
 const MULTI=['<->','->'];
 export function tokenize(src){
   const s = normalizeExpr(src);
-  const tok = []; let i=0;
+  const tok=[]; let i=0;
   while(i<s.length){
-    const ch = s[i];
+    const ch=s[i];
     if(/\s/.test(ch)){ i++; continue; }
     let matched=false;
-    for(let k=0;k<MULTI.length;k++){
-      const m=MULTI[k];
+    for(const m of MULTI){
       if(s.slice(i,i+m.length)===m){ tok.push(['OP', m==='->'?'IMPLIES':'IFF']); i+=m.length; matched=true; break; }
     }
     if(matched) continue;
@@ -38,34 +37,32 @@ export function tokenize(src){
   return tok;
 }
 export function toRPN(tokens){
-  const out=[]; const st=[];
-  for(let j=0;j<tokens.length;j++){
-    const tt=tokens[j][0], tv=tokens[j][1];
+  const out=[], st=[];
+  for(const [tt,tv] of tokens){
     if(tt==='VAR'){ out.push([tt,tv]); continue; }
     if(tt==='OP'){
       while(st.length && st[st.length-1][0]==='OP'){
-        const top=st[st.length-1][1]; const topI=OP[top]; const curI=OP[tv];
+        const top=st[st.length-1][1], topI=OP[top], curI=OP[tv];
         if(topI.prec>curI.prec || (topI.prec===curI.prec && curI.assoc==='left')) out.push(st.pop()); else break;
       }
       st.push([tt,tv]); continue;
     }
     if(tt==='LPAREN'){ st.push([tt,tv]); continue; }
     if(tt==='RPAREN'){
-      let found=false; while(st.length){ const x=st.pop(); if(x[0]==='LPAREN'){ found=true; break;} out.push(x);} if(!found) throw new ParseError('Missing (');
-      continue;
+      let found=false; while(st.length){ const x=st.pop(); if(x[0]==='LPAREN'){ found=true; break; } out.push(x); }
+      if(!found) throw new ParseError('Missing ('); continue;
     }
     throw new ParseError('Token error');
   }
-  while(st.length){ const x=st.pop(); if(x[0]==='LPAREN') throw new ParseError('Unbalanced parentheses'); out.push(x);} 
+  while(st.length){ const x=st.pop(); if(x[0]==='LPAREN') throw new ParseError('Unbalanced parentheses'); out.push(x); }
   return out;
 }
 export function evalRPN(rpn, ctx){
   const st=[];
-  for(let j=0;j<rpn.length;j++){
-    const tt=rpn[j][0], tv=rpn[j][1];
+  for(const [tt,tv] of rpn){
     if(tt==='VAR'){ st.push(!!ctx[tv]); continue; }
     if(tt==='OP'){
-      const ar = OP[tv].arity;
+      const ar=OP[tv].arity;
       if(ar===1){ const a=!!st.pop(); st.push(!a); continue; }
       const b=!!st.pop(); const a=!!st.pop();
       switch(tv){
@@ -84,7 +81,6 @@ export function evalRPN(rpn, ctx){
   if(st.length!==1) throw new ParseError('Malformed expression');
   return !!st[0];
 }
-// helpers for tests/extern
 export function truthVector(expr, n){
   const rpn=toRPN(tokenize(expr)); const vec=[];
   for(let k=0;k<(1<<n);k++){
@@ -96,7 +92,7 @@ export function truthVector(expr, n){
 export function eq(a,b){ if(a.length!==b.length) return false; for(let i=0;i<a.length;i++) if(a[i]!==b[i]) return false; return true; }
 export function runTests(){
   try{
-    // existing tests (unchanged)
+    // existing tests (kept)
     eq(truthVector('A & B',2),[0,0,0,1]);
     eq(truthVector('A | B',2),[0,1,1,1]);
     eq(truthVector('A -> B',2),[1,1,0,1]);
