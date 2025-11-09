@@ -15,24 +15,26 @@
     </div>
 
     <div class="layout">
-      <div class="panel canvasWrap">
-        <!-- no canvas; pure SVG -->
+      <div class="panel leftPanel">
+        <!-- Pure SVG, kein Canvas-Render -->
         <svg id="vennSvg" class="vennSvg" aria-label="Venn Diagram"></svg>
       </div>
 
-      <div class="panel right">
+      <div class="panel rightPanel">
         <div class="controls">
           <div class="field">
             <input id="expr" spellcheck="false" placeholder="e.g. (A ∨ B) ∧ (A ∨ C)" />
             <button class="btn primary" id="btnRender">Render</button>
             <button class="btn ghost" id="btnClear">Clear</button>
-            <button class="btn ghost" id="btnExport">SVG</button>
+            <button class="btn ghost" id="btnExportPng">PNG</button>
+            <button class="btn ghost" id="btnExportSvg">SVG</button>
           </div>
           <div class="toggle">
             <label><input type="radio" name="mode" value="3" checked> 3 sets</label>
             <label><input type="radio" name="mode" value="2"> 2 sets</label>
             <span class="warn" id="warnC" style="display:none">C is ignored in 2-set mode.</span>
           </div>
+          <div id="status" class="status" aria-live="polite"></div>
         </div>
 
         <div class="chips" id="chips"></div>
