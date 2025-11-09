@@ -1,21 +1,22 @@
 import { ParseError, tokenize, toRPN, evalRPN, truthVector, eq, runTests } from './logic.js';
-import { getDPR, drawVenn, drawBackdrop, drawMessage } from './draw.js';
+import { initSVG, setMode, setRegions } from './svg.js';
 
+// cursor
 const cursor = document.getElementById('cursor');
-const exprEl  = document.getElementById('expr');
-const warnC   = document.getElementById('warnC');
-const canvas  = document.getElementById('venn');
-const ctx     = canvas.getContext('2d');
-
-// smooth cursor
 let tx=0, ty=0, cx=0, cy=0;
 window.addEventListener('mousemove', e=>{ tx=e.clientX; ty=e.clientY; });
 (function raf(){ cx+=(tx-cx)*0.16; cy+=(ty-cy)*0.16; cursor.style.left=cx+'px'; cursor.style.top=cy+'px'; requestAnimationFrame(raf); })();
-window.addEventListener('mousedown', ()=>{ cursor.style.transform='translate(-50%,-50%) scale(0.86)'; });
-window.addEventListener('mouseup',   ()=>{ cursor.style.transform='translate(-50%,-50%) scale(1)';   });
+window.addEventListener('mousedown', ()=> cursor.style.transform='translate(-50%,-50%) scale(0.86)');
+window.addEventListener('mouseup',   ()=> cursor.style.transform='translate(-50%,-50%) scale(1)');
 
-// chips
+const svg = document.getElementById('vennSvg');
+initSVG(svg);
+
+// UI refs
+const exprEl = document.getElementById('expr');
+const warnC  = document.getElementById('warnC');
 const chipsWrap = document.getElementById('chips');
+
 const chipDefs = [
   {t:'A',v:'A'},{t:'B',v:'B'},{t:'C',v:'C'},
   {t:'(',v:'('},{t:')',v:')'},
@@ -30,8 +31,8 @@ for(const c of chipDefs){
 function insertAtCursor(input, text){
   const s=(input.selectionStart==null?input.value.length:input.selectionStart);
   const e=(input.selectionEnd==null?input.value.length:input.selectionEnd);
-  const val=input.value; input.value=val.slice(0,s)+text+val.slice(e);
-  const p=s+text.length; input.selectionStart=input.selectionEnd=p; input.focus();
+  input.value = input.value.slice(0,s)+text+input.value.slice(e);
+  input.selectionStart = input.selectionEnd = s+text.length; input.focus();
 }
 function backspaceAtCursor(input){
   let s=(input.selectionStart==null?input.value.length:input.selectionStart);
@@ -40,70 +41,24 @@ function backspaceAtCursor(input){
   if(s>0){ input.value=input.value.slice(0,s-1)+input.value.slice(s); input.selectionStart=input.selectionEnd=s-1; input.focus(); }
 }
 
-// resize (RAF-batched, no layout writes inside observer)
-let pendingResize=null, resizeScheduled=false, lastW=0, lastH=0, lastDPR=getDPR();
-const ro=new ResizeObserver(entries=>{ const cr=entries[0].contentRect; scheduleCanvasResize(cr.width, cr.height); });
-ro.observe(canvas);
-window.addEventListener('resize', ()=> scheduleCanvasResize(canvas.clientWidth, canvas.clientHeight));
-function scheduleCanvasResize(cssW, cssH){
-  const dpr=getDPR(); const targetW=Math.floor(cssW*dpr); const targetH=Math.floor(cssH*dpr);
-  pendingResize={w:targetW,h:targetH,dpr};
-  if(resizeScheduled) return;
-  resizeScheduled=true;
-  requestAnimationFrame(()=>{
-    resizeScheduled=false;
-    if(!pendingResize) return;
-    const {w,h,dpr:curDPR}=pendingResize; pendingResize=null;
-    if(w!==lastW||h!==lastH||curDPR!==lastDPR){
-      lastW=w; lastH=h; lastDPR=curDPR;
-      canvas.width=w; canvas.height=h;
-      scheduleRender();
-    }
-  });
-}
-
-// render pipeline
-let renderPending=false;
-function scheduleRender(){ if(renderPending) return; renderPending=true; requestAnimationFrame(()=>{ renderPending=false; render(); }); }
-function render(){
-  const raw = exprEl.value.trim();
-  const mode = +document.querySelector('input[name="mode"]:checked').value;
-  warnC.style.display = (mode===2 && /\bC\b/.test(raw)) ? 'inline' : 'none';
-  let rpn;
-  try{ rpn = toRPN(tokenize(raw)); }
-  catch(e){ drawBackdrop(ctx,canvas); drawMessage(ctx,canvas,'Parse error: '+e.message); updateTable(null, mode); return; }
-  drawVenn(ctx,canvas,rpn,mode,evalRPN);
-  updateTable(rpn, mode);
-  runTests(); // silent
-}
-
 // truth table
-function escHTML(s){
-  let out=""; for(let i=0;i<s.length;i++){
-    const ch=s[i];
-    if(ch==='&') out+='&amp;'; else if(ch==='<') out+='&lt;'; else if(ch==='>') out+='&gt;';
-    else if(ch==='"') out+='&quot;'; else if(ch==="'") out+='&#39;'; else out+=ch;
-  } return out;
-}
+function escHTML(s){ return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;"); }
 function prettyExpr(s){ return escHTML(s.split('<->').join('↔').split('->').join('→').split('|').join('∨').split('&').join('∧').split('~').join('¬')); }
 function updateTable(rpn, mode){
   const thead=document.getElementById('thead'), tbody=document.getElementById('tbody'), colg=document.getElementById('colgroup');
   thead.innerHTML=''; tbody.innerHTML=''; colg.innerHTML='';
-  const label = prettyExpr(exprEl.value.trim());
-  const cg = mode===3 ? '<col><col><col><col class="sep">' : '<col><col><col class="sep">';
+  const label=prettyExpr(exprEl.value.trim());
+  const cg = mode===3?'<col><col><col><col class="sep">':'<col><col><col class="sep">';
   colg.insertAdjacentHTML('beforeend', cg);
-  const header = mode===3
+  thead.insertAdjacentHTML('beforeend', mode===3
     ? `<tr><th>A</th><th>B</th><th>C</th><th>${label}</th></tr>`
-    : `<tr><th>A</th><th>B</th><th>${label}</th></tr>`;
-  thead.insertAdjacentHTML('beforeend', header);
+    : `<tr><th>A</th><th>B</th><th>${label}</th></tr>`);
+
   if(!rpn) return;
-  const n = mode===3 ? 3 : 2;
-  const rows = 1<<n;
+  const n=mode===3?3:2, rows=1<<n;
   for(let k=0;k<rows;k++){
-    const A=!!((k>>(n-1-0))&1);
-    const B=!!((k>>(n-1-1))&1);
-    const C=n===3?!!((k>>(n-1-2))&1):false;
-    const f=evalRPN(rpn,{A,B,C});
+    const A=!!((k>>(n-1-0))&1), B=!!((k>>(n-1-1))&1), C=n===3?!!((k>>(n-1-2))&1):false;
+    const f = evalRPN(rpn,{A,B,C});
     const row = mode===3
       ? `<tr><td>${A?1:0}</td><td>${B?1:0}</td><td>${C?1:0}</td><td>${f?1:0}</td></tr>`
       : `<tr><td>${A?1:0}</td><td>${B?1:0}</td><td>${f?1:0}</td></tr>`;
@@ -111,18 +66,50 @@ function updateTable(rpn, mode){
   }
 }
 
+// render
+function computeRegions(rpn, mode){
+  if(!rpn) return {OUT:0,A:0,B:0,C:0,AB:0,AC:0,BC:0,ABC:0};
+  const v = (A,B,C)=> evalRPN(rpn,{A,B,C})?1:0;
+  if(mode===2){
+    return { OUT:v(0,0,0), A:v(1,0,0), B:v(0,1,0), C:0, AB:v(1,1,0), AC:0, BC:0, ABC:0 };
+  }
+  return {
+    OUT:v(0,0,0), A:v(1,0,0), B:v(0,1,0), C:v(0,0,1),
+    AB:v(1,1,0), AC:v(1,0,1), BC:v(0,1,1), ABC:v(1,1,1)
+  };
+}
+
+function render(){
+  const raw = exprEl.value.trim();
+  const mode = +document.querySelector('input[name="mode"]:checked').value;
+  setMode(svg, mode);
+  warnC.style.display = (mode===2 && /\bC\b/.test(raw)) ? 'inline' : 'none';
+
+  let rpn=null;
+  try{ rpn = toRPN(tokenize(raw)); }
+  catch(e){ updateTable(null, mode); setRegions(svg, {OUT:0,A:0,B:0,C:0,AB:0,AC:0,BC:0,ABC:0}); return; }
+
+  const active = computeRegions(rpn, mode);
+  setRegions(svg, active);
+  updateTable(rpn, mode);
+  runTests(); // silent
+}
+
 // events
-document.getElementById('btnRender').onclick = ()=> scheduleRender();
-document.getElementById('btnClear').onclick  = ()=>{ exprEl.value=''; scheduleRender(); };
+document.getElementById('btnRender').onclick = ()=> render();
+document.getElementById('btnClear').onclick  = ()=>{ exprEl.value=''; render(); };
 document.getElementById('btnExport').onclick = ()=>{
-  const tmp=document.createElement('canvas'); tmp.width=canvas.width; tmp.height=canvas.height;
-  const tctx=tmp.getContext('2d'); tctx.fillStyle='#0b0d10'; tctx.fillRect(0,0,tmp.width,tmp.height); tctx.drawImage(canvas,0,0);
-  const a=document.createElement('a'); a.href=tmp.toDataURL('image/png'); a.download='venn.png'; a.click();
+  // Export as SVG (no canvas used)
+  const serializer = new XMLSerializer();
+  const src = serializer.serializeToString(svg);
+  const blob = new Blob([src], {type:'image/svg+xml;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'venn.svg'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 0);
 };
-Array.from(document.getElementsByName('mode')).forEach(r=> r.addEventListener('change', ()=> scheduleRender()));
-exprEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); scheduleRender(); } });
+Array.from(document.getElementsByName('mode')).forEach(r=> r.addEventListener('change', render));
+exprEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); render(); } });
 
 // init
 exprEl.value='(A ∨ B) ∧ (A ∨ C)';
-scheduleCanvasResize(canvas.clientWidth, canvas.clientHeight);
-scheduleRender();
+render();
