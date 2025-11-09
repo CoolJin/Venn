@@ -3,8 +3,15 @@
   --text:#e9ecf1; --sub:#a9b3c7; --neon:#00e5ff; --bad:#ff6b6b;
 }
 
-/* Cursor überall weg */
-* { cursor: none !important; }
+/* Desktop: Systemcursor aus, Custom-Cursor sichtbar */
+@media (pointer: fine) {
+  * { cursor: none !important; }
+  .cursor { display:block; }
+}
+/* Mobile/Coarse: kein Custom-Cursor */
+@media (pointer: coarse), (hover: none) {
+  .cursor { display:none !important; }
+}
 
 html,body{height:100%}
 body{
@@ -18,7 +25,7 @@ body{
   overflow:hidden;
 }
 
-/* custom cursor bubble (bleibt) */
+/* custom cursor bubble (nur Desktop aktiv) */
 .cursor{ position:fixed; left:0; top:0; width:18px; height:18px; border:2px solid var(--neon);
   border-radius:50%; pointer-events:none; mix-blend-mode:screen; filter:drop-shadow(0 0 6px var(--neon));
   transform:translate(-50%,-50%); z-index:9999; transition:transform .12s ease; }
@@ -69,7 +76,7 @@ body{
   transform: translateY(-1px);
 }
 
-/* Neon-Pill Buttons (mehr Farbe, weniger Blur, animierter Hover) */
+/* Neon-Pill Buttons */
 .btn{
   position:relative;
   border:1px solid rgba(255,255,255,0.12);
@@ -95,7 +102,7 @@ body{
   border-color: rgba(0,229,255,0.45);
 }
 
-/* Segmented Mode Switch (2/3 sets) im Screenshot-Stil */
+/* Segmented 2/3 sets */
 .toggle{
   display:flex; gap:10px; align-items:center; color:var(--sub); flex-wrap:wrap;
 }
@@ -107,7 +114,7 @@ body{
   border:1px solid rgba(255,255,255,0.10);
   transition: transform .08s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease, filter .2s ease;
 }
-.toggle label:nth-of-type(2){ /* orange Akzent für 2-set */
+.toggle label:nth-of-type(2){
   --active:#ff8a00; --activeSoft:rgba(255,138,0,0.18); --glow:rgba(255,138,0,0.30);
 }
 .toggle input{ display:none; }
@@ -124,7 +131,7 @@ body{
 /* Status/Fehler */
 .status{ min-height:18px; color:var(--bad); font-size:12px; }
 
-/* Chips deutlich präsenter */
+/* Chips präsenter */
 .chips{ display:flex; flex-wrap:wrap; gap:10px; }
 .chip{
   position:relative; border:1px solid rgba(0,229,255,0.35);
@@ -159,3 +166,20 @@ tbody td{ border-bottom:1px solid rgba(255,255,255,0.10); padding:8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace }
 tbody tr:hover{ background: rgba(0,229,255,0.06); transition:.15s background }
 .warn{ color:var(--bad); font-size:12px; }
+
+/* ---------- Mobile Layout (nur Layout, Design bleibt) ---------- */
+@media (max-width: 900px) {
+  body{ overflow:auto; }
+  .wrap{ max-width:96vw; height:auto; }
+  .layout{ grid-template-columns: 1fr; height:auto; }
+  .vennSvg{ height:56vh; min-height:320px; } /* Platz für Touch */
+  .rightPanel{ padding:10px; }
+  .field input{ padding:14px 16px; font-size:16px; border-radius:18px; }
+  .btn{ padding:12px 16px; border-radius:18px; }
+  .chips{ gap:12px; }
+  .chip{ padding:12px 14px; border-radius:16px; }
+  .toggle{ gap:12px; }
+  .toggle label{ width:calc(50% - 6px); justify-content:center; }
+  .tableWrap{ max-height:48vh; }
+  thead th, tbody td{ padding:10px; }
+}
