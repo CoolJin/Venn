@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Venn Diagramm Generator</title>
+<title>Venn Diagram Generator</title>
 <style>
   :root{
     --bg:#0b0d10; --panel:rgba(20,22,28,0.65); --panel-border:rgba(255,255,255,0.09);
-    --text:#e9ecf1; --sub:#a9b3c7; --neon:#00e5ff; --bad:#ff6b6b; --ok:#17e5a1;
+    --text:#e9ecf1; --sub:#a9b3c7; --neon:#00e5ff; --vio:#a855f7;
+    --bad:#ff6b6b; --ok:#17e5a1; --chip:#0f141a;
   }
   html,body{height:100%}
   body{
@@ -18,92 +19,106 @@
       var(--bg);
     color:var(--text);
     font: 15px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
-    overflow-x:hidden; cursor:none;
+    overflow:hidden; /* no page scroll */
+    cursor:none;
   }
-  /* smoother custom cursor */
-  .cursor{ position:fixed; inset:auto; left:0; top:0; width:18px; height:18px; border:2px solid var(--neon);
+  /* smooth custom cursor */
+  .cursor{ position:fixed; left:0; top:0; width:18px; height:18px; border:2px solid var(--neon);
            border-radius:50%; pointer-events:none; mix-blend-mode:screen; filter:drop-shadow(0 0 6px var(--neon));
            transform:translate(-50%,-50%); z-index:9999; transition:transform .12s ease; }
   .cursor:after{content:""; position:absolute; inset:2px; border-radius:50%; border:1px solid rgba(255,255,255,0.4)}
 
-  .wrap{ max-width:92vw; margin:2vh auto; padding:0 1vw; }
-  .header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .wrap{ max-width:96vw; margin:1.5vh auto; padding:0 0.5vw; height:97vh; display:flex; flex-direction:column; gap:10px; }
+  .header{ display:flex; align-items:center; justify-content:space-between; }
   .title{ font-size:22px; font-weight:800; letter-spacing:.3px }
 
-  .card{ position:relative; padding:14px; border-radius:22px; background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.025));
-         border:1px solid var(--panel-border); backdrop-filter:blur(12px); box-shadow:0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04) }
-  .card h3{ margin:4px 0 10px; font-size:14px; color:var(--sub); font-weight:600; letter-spacing:.2px }
+  /* layout: left canvas 3/4, right controls+table 1/4 */
+  .layout{ display:grid; grid-template-columns: 3fr 1.1fr; gap:14px; align-items:stretch; height:calc(97vh - 42px); }
+  @media (max-width: 1100px){ .layout{ grid-template-columns:1fr; height:auto } body{overflow:auto} }
 
-  .controls{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px }
-  .input{ flex:1 1 520px; display:flex; gap:8px; align-items:center }
-  .input input{ flex:1; background:rgba(255,255,255,0.04); border:1px solid var(--panel-border); border-radius:14px; padding:10px 12px; color:var(--text);
-                outline:none; transition:.2s border,.2s box-shadow; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.02) }
-  .input input:focus{ border-color:rgba(0,229,255,0.4); box-shadow:0 0 0 3px rgba(0,229,255,0.12) }
+  .panel{ position:relative; border-radius:20px; background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+          border:1px solid var(--panel-border); backdrop-filter: blur(12px); box-shadow:0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04); }
 
-  .btn{ border:1px solid var(--panel-border); background:rgba(255,255,255,0.02); color:var(--text); padding:8px 10px; border-radius:12px; cursor:pointer; backdrop-filter:blur(8px);
-        transition:transform .06s, border-color .2s, background .2s, box-shadow .2s }
-  .btn:hover{ border-color:rgba(255,255,255,0.2); box-shadow:0 0 14px rgba(0,229,255,0.10) }
-  .btn:active{ transform:translateY(1px) scale(.99) }
-  .btn.primary{ border-color:rgba(0,229,255,0.35); box-shadow:0 0 16px rgba(0,229,255,0.12), inset 0 0 0 1px rgba(0,229,255,0.06);
-                background:linear-gradient(180deg, rgba(0,229,255,0.12), rgba(0,229,255,0.07)) }
+  /* left: canvas fills height */
+  .canvasWrap{ height:100%; display:flex; align-items:center; justify-content:center; padding:10px; }
+  #venn{ width:100%; height:100%; display:block; border-radius:16px; background:rgba(10,12,16,0.82); border:1px solid var(--panel-border);
+         box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03), 0 0 40px rgba(0,229,255,0.08); animation:glowPulse 4s ease-in-out infinite alternate; }
+  @keyframes glowPulse{ 0%{ box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03), 0 0 0 rgba(0,229,255,0) } 100%{ box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03), 0 0 44px rgba(0,229,255,0.10) } }
 
-  .toggle{ display:flex; gap:10px; align-items:center }
-  .toggle input{ accent-color:var(--neon) }
+  /* right: controls + table in column, internal scroll allowed */
+  .right{ display:flex; flex-direction:column; padding:12px; gap:10px; overflow:hidden; }
+  .controls{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .field{ flex:1 1 auto; display:flex; align-items:center; gap:8px; }
+  .field input{ flex:1; background: rgba(255,255,255,0.05); border:1px solid var(--panel-border); border-radius:14px; padding:10px 12px;
+                color:var(--text); outline:none; transition:.2s border,.2s box-shadow; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); }
+  .field input:focus{ border-color: rgba(0,229,255,0.4); box-shadow: 0 0 0 3px rgba(0,229,255,0.12) }
 
-  .chips{ display:flex; flex-wrap:wrap; gap:6px }
-  .chip{ border:1px dashed rgba(255,255,255,0.18); border-radius:12px; padding:6px 8px; color:var(--sub); cursor:pointer; transition:.15s border-color,.15s color,.15s transform }
-  .chip:hover{ border-color:rgba(255,255,255,0.35); color:var(--text); transform:translateY(-1px) }
+  .btn{ border:1px solid var(--panel-border); background:rgba(255,255,255,0.03); color:var(--text); padding:8px 10px; border-radius:12px; cursor:pointer; user-select:none;
+        transition: transform .06s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease; backdrop-filter: blur(8px); }
+  .btn:hover{ border-color: rgba(255,255,255,0.2); box-shadow: 0 0 14px rgba(0,229,255,0.10) }
+  .btn:active{ transform: translateY(1px) scale(.99) }
+  .btn.primary{ border-color: rgba(0,229,255,0.35); background: linear-gradient(180deg, rgba(0,229,255,0.12), rgba(0,229,255,0.07)); }
+  .btn.ghost{ background: rgba(255,255,255,0.02) }
 
-  .canvasWrap{ position:relative; border-radius:18px; overflow:hidden; border:1px solid var(--panel-border); background:rgba(10,12,16,0.78);
-               box-shadow:0 10px 30px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.03); animation:glowPulse 4s ease-in-out infinite alternate }
-  @keyframes glowPulse{ 0%{ box-shadow:0 10px 30px rgba(0,0,0,0.35), 0 0 0 rgba(0,229,255,0)} 100%{ box-shadow:0 10px 30px rgba(0,0,0,0.35), 0 0 44px rgba(0,229,255,0.10)} }
-  #venn{ width:100%; height:80vh; display:block }
+  .toggle{ display:flex; gap:10px; align-items:center; color:var(--sub); }
+  .toggle input{ accent-color: var(--neon); }
 
-  table{ width:100%; border-collapse:collapse; margin-top:12px }
+  /* chips more visible */
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{ position:relative; border:1px solid rgba(0,229,255,0.24); background: linear-gradient(180deg, rgba(0,229,255,0.14), rgba(0,229,255,0.06));
+         color:var(--text); padding:8px 10px; border-radius:12px; cursor:pointer; box-shadow: 0 0 12px rgba(0,229,255,0.10), inset 0 0 0 1px rgba(255,255,255,0.05);
+         transition: transform .08s ease, box-shadow .2s ease, border-color .2s ease; font-weight:600; letter-spacing:.2px; }
+  .chip:hover{ transform: translateY(-1px); box-shadow: 0 0 18px rgba(0,229,255,0.16) }
+  .chip.delete{ border-color: rgba(255,107,107,0.4); background: linear-gradient(180deg, rgba(255,107,107,0.18), rgba(255,107,107,0.08)); }
+
+  /* table */
+  .tableWrap{ flex:1 1 auto; overflow:auto; border:1px solid var(--panel-border); border-radius:14px; background: rgba(255,255,255,0.03); }
+  table{ width:100%; border-collapse: collapse; }
+  col.sep{ border-left:2px solid rgba(255,255,255,0.18); }
   thead th{ text-align:left; font-weight:700; font-size:12px; color:var(--sub); border-bottom:1px solid var(--panel-border); padding:8px }
-  tbody td{ border-bottom:1px dashed rgba(255,255,255,0.09); padding:8px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace }
-  tbody tr:nth-child(odd){ background:rgba(255,255,255,0.02) }
-  .warn{ color:var(--bad); font-size:12px; margin-left:6px }
+  tbody td{ border-bottom:1px solid rgba(255,255,255,0.10); padding:8px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace }
+  tbody tr:hover{ background: rgba(0,229,255,0.06); transition:.15s background }
 
-  .tests{ margin-top:12px; font-size:13px; color:var(--sub) }
-  .tests .pass{ color:var(--ok) }
-  .tests .fail{ color:var(--bad) }
-
-  @media (max-width:900px){ .wrap{max-width:96vw} #venn{height:70vh} }
+  .warn{ color:var(--bad); font-size:12px; }
 </style>
 </head>
 <body>
 <div class="cursor" id="cursor"></div>
 <div class="wrap">
-  <div class="header"><div class="title">Venn Diagramm Generator</div></div>
+  <div class="header">
+    <div class="title">Venn Diagram Generator</div>
+  </div>
 
-  <div class="card">
-    <h3>Ausdruck & Darstellung</h3>
-    <div class="controls">
-      <div class="input">
-        <input id="expr" spellcheck="false" placeholder="z. B. (A ∨ B) ∧ (A ∨ C)" />
-        <button class="btn primary" id="btnRender">Rendern</button>
-        <button class="btn" id="btnExport">PNG</button>
-      </div>
-      <div class="toggle">
-        <label><input type="radio" name="mode" value="3" checked> 3 Mengen</label>
-        <label><input type="radio" name="mode" value="2"> 2 Mengen</label>
-        <span class="warn" id="warnC" style="display:none">C wird im 2‑Mengen‑Modus ignoriert.</span>
-      </div>
+  <div class="layout">
+    <div class="panel canvasWrap">
+      <canvas id="venn"></canvas>
     </div>
 
-    <div class="chips" id="chips"></div>
+    <div class="panel right">
+      <div class="controls">
+        <div class="field">
+          <input id="expr" spellcheck="false" placeholder="e.g. (A ∨ B) ∧ (A ∨ C)" />
+          <button class="btn primary" id="btnRender">Render</button>
+          <button class="btn ghost" id="btnClear">Clear</button>
+          <button class="btn ghost" id="btnExport">PNG</button>
+        </div>
+        <div class="toggle">
+          <label><input type="radio" name="mode" value="3" checked> 3 sets</label>
+          <label><input type="radio" name="mode" value="2"> 2 sets</label>
+          <span class="warn" id="warnC" style="display:none">C is ignored in 2-set mode.</span>
+        </div>
+      </div>
 
-    <div class="canvasWrap">
-      <canvas id="venn" width="1000" height="600"></canvas>
+      <div class="chips" id="chips"></div>
+
+      <div class="tableWrap">
+        <table>
+          <colgroup id="colgroup"></colgroup>
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
     </div>
-
-    <table>
-      <thead id="thead"></thead>
-      <tbody id="tbody"></tbody>
-    </table>
-
-    <div id="tests" class="tests"></div>
   </div>
 </div>
 
@@ -116,92 +131,124 @@
   window.addEventListener('mousedown', ()=>{ cursor.style.transform = 'translate(-50%,-50%) scale(0.86)'; });
   window.addEventListener('mouseup',   ()=>{ cursor.style.transform = 'translate(-50%,-50%) scale(1)';   });
 
-  // ---------- UI refs ----------
+  // ---------- Refs ----------
   const exprEl = document.getElementById('expr');
   const warnC = document.getElementById('warnC');
-  const venn = document.getElementById('venn');
-  const ctx = venn.getContext('2d');
-  const DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+  const canvas = document.getElementById('venn');
+  const ctx = canvas.getContext('2d');
 
-  function resizeCanvas(){
-    const rect = venn.getBoundingClientRect();
-    venn.width  = Math.floor(rect.width * DPR);
-    venn.height = Math.floor(rect.height * DPR);
+  // DPR-safe getter
+  function getDPR(){ return Math.max(1, Math.min(window.devicePixelRatio || 1, 2)); }
+
+  // ---------- Resize handling (debounced, no recursive layout thrash) ----------
+  let pendingResize = null; let resizeScheduled = false; let lastW=0, lastH=0, lastDPR=getDPR();
+  const ro = new ResizeObserver(entries => {
+    const cr = entries[0].contentRect; // no getBoundingClientRect() here
+    scheduleCanvasResize(cr.width, cr.height);
+  });
+  ro.observe(canvas);
+
+  window.addEventListener('resize', ()=>{
+    // also catch DPR changes indirectly
+    scheduleCanvasResize(canvas.clientWidth, canvas.clientHeight);
+  });
+
+  function scheduleCanvasResize(cssW, cssH){
+    const dpr = getDPR();
+    const targetW = Math.floor(cssW * dpr);
+    const targetH = Math.floor(cssH * dpr);
+    pendingResize = {w:targetW, h:targetH, dpr};
+    if(resizeScheduled) return;
+    resizeScheduled = true;
+    requestAnimationFrame(()=>{
+      resizeScheduled = false;
+      if(!pendingResize) return;
+      const {w,h,dpr:curDpr} = pendingResize; pendingResize = null;
+      if(w!==lastW || h!==lastH || curDpr!==lastDPR){
+        lastW=w; lastH=h; lastDPR=curDpr;
+        canvas.width = w; canvas.height = h; // only attribute change, no style writes
+        scheduleRender();
+      }
+    });
   }
-  new ResizeObserver(resizeCanvas).observe(venn);
-  resizeCanvas();
 
-  // ---------- Chips (ohne A\\B und ^ in der UI) ----------
+  // initial size
+  scheduleCanvasResize(canvas.clientWidth, canvas.clientHeight);
+
+  // ---------- Chips (visible, plus delete) ----------
   const chipsWrap = document.getElementById('chips');
-  [
+  const chipDefs = [
     {t:'A',v:'A'},{t:'B',v:'B'},{t:'C',v:'C'},
     {t:'(',v:'('},{t:')',v:')'},
-    {t:'¬',v:'¬'},{t:'∧',v:'∧'},{t:'∨',v:'∨'},{t:'→',v:'->'},{t:'↔',v:'<->'}
-  ].forEach(c=>{
-    const b=document.createElement('div'); b.className='chip'; b.textContent=c.t; b.title='Einfügen';
-    b.onclick=()=>insertAtCursor(exprEl,c.v); chipsWrap.appendChild(b);
+    {t:'¬',v:'¬'},{t:'∧',v:'∧'},{t:'∨',v:'∨'},{t:'→',v:'->'},{t:'↔',v:'<->'},
+    {t:'⌫',v:'__BACKSPACE__', cls:'delete'}
+  ];
+  chipDefs.forEach(c=>{
+    const b=document.createElement('div'); b.className='chip'+(c.cls?(' '+c.cls):''); b.textContent=c.t;
+    b.onclick=()=>{ if(c.v==='__BACKSPACE__') backspaceAtCursor(exprEl); else insertAtCursor(exprEl, c.v); };
+    chipsWrap.appendChild(b);
   });
 
   function insertAtCursor(input, text){
-    const [s,e] = [input.selectionStart, input.selectionEnd];
-    const val = input.value; input.value = val.slice(0,s) + text + val.slice(e);
+    const s = (input.selectionStart==null? input.value.length: input.selectionStart);
+    const e = (input.selectionEnd==null? input.value.length: input.selectionEnd);
+    const val = input.value;
+    input.value = val.slice(0,s) + text + val.slice(e);
     const p = s + text.length; input.selectionStart = input.selectionEnd = p; input.focus();
+  }
+  function backspaceAtCursor(input){
+    let s = (input.selectionStart==null? input.value.length: input.selectionStart);
+    let e = (input.selectionEnd==null? input.value.length: input.selectionEnd);
+    if(s!==e){ input.value = input.value.slice(0,s) + input.value.slice(e); input.selectionStart=input.selectionEnd=s; input.focus(); return; }
+    if(s>0){ input.value = input.value.slice(0,s-1) + input.value.slice(s); input.selectionStart=input.selectionEnd=s-1; input.focus(); }
   }
 
   // ---------- Parser ----------
   class ParseError extends Error{ constructor(msg){ super(msg); this.name='ParseError'; } }
-
   const OP = {
     NOT: {prec:5, assoc:'right', arity:1},
     AND: {prec:4, assoc:'left',  arity:2},
     OR:  {prec:2, assoc:'left',  arity:2},
-    XOR: {prec:3, assoc:'left',  arity:2}, // unterstützt, aber kein Chip
+    XOR: {prec:3, assoc:'left',  arity:2}, // supported but no chip
     IMPLIES:{prec:1, assoc:'right', arity:2},
     IFF: {prec:0, assoc:'right', arity:2},
-    DIFF:{prec:4, assoc:'left',  arity:2}  // unterstützt, aber kein Chip
+    DIFF:{prec:4, assoc:'left',  arity:2}  // supported but no chip
   };
-
   function normalizeExpr(s){
+    // Replace arrow symbols; strip zero-width spaces & BOMs to avoid invisible-token bugs
     return s
       .replace(/→/g,'->').replace(/↔/g,'<->')
-      .replace(/\bnicht\b/gi,'~')
-      .replace(/\bund\b/gi,'&')
-      .replace(/\boder\b/gi,'|')
-      .replace(/\bxor\b/gi,'^');
+      .replace(/[\u200B-\u200D\uFEFF]/g,'');
   }
-  const MULTI = ['<->','->'];
-
+  const MULTI=['<->','->'];
   function tokenize(src){
     const s = normalizeExpr(src);
-    const tok = [];
-    let i=0;
+    const tok = []; let i=0;
     while(i<s.length){
       const ch = s[i];
-      if(/\s/.test(ch)){ i++; continue; }
+      if(/\s/.test(ch)){ i++; continue; } // whitespace of any kind
       let matched=false;
-      for(const m of MULTI){
-        if(s.startsWith(m,i)){
-          tok.push(['OP', m==='->'?'IMPLIES':'IFF']);
-          i+=m.length; matched=true; break;
-        }
+      for(let k=0;k<MULTI.length;k++){
+        const m = MULTI[k];
+        if(s.slice(i,i+m.length)===m){ tok.push(['OP', m==='->'?'IMPLIES':'IFF']); i+=m.length; matched=true; break; }
       }
       if(matched) continue;
       if(ch==='('){ tok.push(['LPAREN','(']); i++; continue; }
       if(ch===')'){ tok.push(['RPAREN',')']); i++; continue; }
-      if(/[ABC]/.test(ch)){ tok.push(['VAR',ch]); i++; continue; }
+      if(ch==='A' || ch==='B' || ch==='C'){ tok.push(['VAR',ch]); i++; continue; }
       if(ch==='¬' || ch==='!' || ch==='~'){ tok.push(['OP','NOT']); i++; continue; }
       if(ch==='∧' || ch==='&'){ tok.push(['OP','AND']); i++; continue; }
       if(ch==='∨' || ch==='|'){ tok.push(['OP','OR']); i++; continue; }
       if(ch==='^' || ch==='⊕'){ tok.push(['OP','XOR']); i++; continue; }
       if(ch==='\\'){ tok.push(['OP','DIFF']); i++; continue; }
-      throw new ParseError(`Unbekanntes Zeichen an Pos ${i}: '${ch}'`);
+      throw new ParseError('Unknown token at '+i+': '+ch);
     }
     return tok;
   }
-
   function toRPN(tokens){
     const out=[]; const st=[];
-    for(const [tt,tv] of tokens){
+    for(let j=0;j<tokens.length;j++){
+      const tt=tokens[j][0], tv=tokens[j][1];
       if(tt==='VAR'){ out.push([tt,tv]); continue; }
       if(tt==='OP'){
         while(st.length && st[st.length-1][0]==='OP'){
@@ -213,18 +260,18 @@
       }
       if(tt==='LPAREN'){ st.push([tt,tv]); continue; }
       if(tt==='RPAREN'){
-        let found=false; while(st.length){ const x=st.pop(); if(x[0]==='LPAREN'){ found=true; break;} out.push(x);} if(!found) throw new ParseError('Fehlende (');
+        let found=false; while(st.length){ const x=st.pop(); if(x[0]==='LPAREN'){ found=true; break;} out.push(x);} if(!found) throw new ParseError('Missing (');
         continue;
       }
-      throw new ParseError('Tokenfehler');
+      throw new ParseError('Token error');
     }
-    while(st.length){ const x=st.pop(); if(x[0]==='LPAREN') throw new ParseError('Klammern nicht balanciert'); out.push(x);} 
+    while(st.length){ const x=st.pop(); if(x[0]==='LPAREN') throw new ParseError('Unbalanced parentheses'); out.push(x);} 
     return out;
   }
-
   function evalRPN(rpn, ctx){
     const st=[];
-    for(const [tt,tv] of rpn){
+    for(let j=0;j<rpn.length;j++){
+      const tt=rpn[j][0], tv=rpn[j][1];
       if(tt==='VAR'){ st.push(!!ctx[tv]); continue; }
       if(tt==='OP'){
         const ar = OP[tv].arity;
@@ -237,115 +284,113 @@
           case 'IMPLIES': st.push((!a)||b); break;
           case 'IFF': st.push((a&&b)||(!a&&!b)); break;
           case 'DIFF': st.push(a && !b); break;
-          default: throw new ParseError('Unbekannter Operator '+tv);
+          default: throw new ParseError('Unknown op '+tv);
         }
         continue;
       }
-      throw new ParseError('RPN-Fehler');
+      throw new ParseError('RPN error');
     }
-    if(st.length!==1) throw new ParseError('Ausdruck fehlerhaft');
+    if(st.length!==1) throw new ParseError('Malformed expression');
     return !!st[0];
   }
 
-  // ---------- Pretty expr for table header ----------
-  function escHTML(s){ return s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[ch])); }
-  function prettyExpr(s){
-    s = s.replace(/\bnicht\b/gi,'¬').replace(/\bund\b/gi,'∧').replace(/\boder\b/gi,'∨');
-    s = s.replace(/<->/g,'↔').replace(/->/g,'→').replace(/\|/g,'∨').replace(/&/g,'∧').replace(/~/g,'¬');
-    return escHTML(s);
-  }
-
-  // ---------- Geometry (fixed: no stray braces) ----------
+  // ---------- Geometry (repositioned 3‑set symmetric) ----------
   function centersAndR(mode){
-    const w = venn.width, h = venn.height;
+    const w = canvas.width, h = canvas.height;
     if(mode===3){
-      const r = Math.min(w,h)*0.27; // größere, übersichtlichere Kreise
+      const r = Math.min(w,h)*0.29;
       return { r,
-        A:{x:w*0.35, y:h*0.62},
-        B:{x:w*0.65, y:h*0.62},
+        A:{x:w*0.36, y:h*0.60},
+        B:{x:w*0.64, y:h*0.60},
         C:{x:w*0.50, y:h*0.34}
       };
     } else {
-      const r = Math.min(w,h)*0.32;
+      const r = Math.min(w,h)*0.36;
       return { r,
-        A:{x:w*0.42, y:h*0.55},
-        B:{x:w*0.58, y:h*0.55}
+        A:{x:w*0.42, y:h*0.52},
+        B:{x:w*0.58, y:h*0.52}
       };
     }
   }
   function inside(x,y,c,r){ const dx=x-c.x, dy=y-c.y; return dx*dx+dy*dy <= r*r; }
 
-  // ---------- Render ----------
+  // ---------- Render pipeline (RAf-batched) ----------
+  let renderPending = false;
+  function scheduleRender(){ if(renderPending) return; renderPending = true; requestAnimationFrame(()=>{ renderPending=false; render(); }); }
+
   function render(){
     const raw = exprEl.value.trim();
     const mode = +document.querySelector('input[name="mode"]:checked').value;
-    warnC.style.display = (mode===2 && /\bC\b/.test(raw)) ? 'inline' : 'none';
+    warnC.style.display = (mode===2 && raw.indexOf('C')!==-1) ? 'inline' : 'none';
 
     let rpn;
     try{ rpn = toRPN(tokenize(raw)); }
-    catch(e){ drawBackdrop(); drawMessage('Parse-Fehler: '+e.message); updateTable(null, mode); return; }
+    catch(e){ drawBackdrop(); drawMessage('Parse error: '+e.message); updateTable(null, mode); return; }
 
     drawVenn(rpn, mode);
     updateTable(rpn, mode);
-    runTests();
+    runTests(); // silent
   }
 
   function drawBackdrop(){
-    ctx.save(); ctx.clearRect(0,0,venn.width,venn.height);
-    const grd = ctx.createLinearGradient(0,0,0,venn.height);
+    const w = canvas.width, h = canvas.height;
+    ctx.save(); ctx.clearRect(0,0,w,h);
+    const grd = ctx.createLinearGradient(0,0,0,h);
     grd.addColorStop(0,'rgba(8,10,14,0.98)'); grd.addColorStop(1,'rgba(8,10,14,0.90)');
-    ctx.fillStyle = grd; ctx.fillRect(0,0,venn.width,venn.height); ctx.restore();
+    ctx.fillStyle = grd; ctx.fillRect(0,0,w,h); ctx.restore();
   }
   function drawMessage(msg){
+    const w = canvas.width; const DPR = getDPR();
     ctx.save(); ctx.fillStyle='rgba(255,255,255,0.08)';
-    if(ctx.roundRect){ ctx.roundRect(20*DPR,20*DPR, venn.width-40*DPR, 60*DPR, 14*DPR); ctx.fill(); }
+    if(ctx.roundRect){ ctx.roundRect(20*DPR,20*DPR, w-40*DPR, 60*DPR, 14*DPR); ctx.fill(); }
     ctx.fillStyle='#e9ecf1'; ctx.font = `${16*DPR}px Inter, system-ui, sans-serif`; ctx.textAlign='center';
-    ctx.fillText(msg, venn.width/2, 60*DPR); ctx.restore();
+    ctx.fillText(msg, w/2, 60*DPR); ctx.restore();
   }
-
   function drawVenn(rpn, mode){
     drawBackdrop();
     const geom = centersAndR(mode);
-    const img = ctx.createImageData(venn.width, venn.height);
+    const w = canvas.width, h = canvas.height;
+
+    const img = ctx.createImageData(w, h);
     const data = img.data; const c1 = {r:0, g:229, b:255};
 
-    for(let y=0; y<venn.height; y++){
-      for(let x=0; x<venn.width; x++){
+    for(let y=0; y<h; y++){
+      for(let x=0; x<w; x++){
         let A=false,B=false,C=false;
         if(mode===3){ A=inside(x,y,geom.A,geom.r); B=inside(x,y,geom.B,geom.r); C=inside(x,y,geom.C,geom.r); }
         else { A=inside(x,y,geom.A,geom.r); B=inside(x,y,geom.B,geom.r); }
         if(evalRPN(rpn, {A,B,C})){
-          const idx = (y*venn.width + x)*4;
-          data[idx] = c1.r; data[idx+1] = c1.g; data[idx+2] = c1.b; data[idx+3] = 68;
+          const idx = (y*w + x)*4; data[idx]=c1.r; data[idx+1]=c1.g; data[idx+2]=c1.b; data[idx+3]=72;
         }
       }
     }
     ctx.putImageData(img,0,0);
 
-    // Kreise + Labels mittig
+    // solid outlines + centered labels
+    const DPR = getDPR();
     ctx.save();
-    ctx.lineWidth = 2*DPR; ctx.strokeStyle = 'rgba(255,255,255,0.95)';
-    ctx.shadowColor = 'rgba(0,229,255,0.30)'; ctx.shadowBlur = 8*DPR;
+    ctx.lineWidth = 2*DPR; ctx.strokeStyle = 'rgba(255,255,255,0.98)'; ctx.shadowColor = 'rgba(0,229,255,0.28)'; ctx.shadowBlur = 8*DPR;
     const circle = c => { ctx.beginPath(); ctx.arc(c.x,c.y,geom.r,0,Math.PI*2); ctx.stroke(); };
     circle(geom.A); circle(geom.B); if(mode===3) circle(geom.C);
-
-    ctx.shadowBlur = 0; ctx.fillStyle = '#e9ecf1'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.font = `${18*DPR}px Inter, system-ui, sans-serif`;
-    ctx.fillText('A', geom.A.x, geom.A.y);
-    ctx.fillText('B', geom.B.x, geom.B.y);
-    if(mode===3) ctx.fillText('C', geom.C.x, geom.C.y);
+    ctx.shadowBlur = 0; ctx.fillStyle = '#e9ecf1'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font = `${18*DPR}px Inter, system-ui, sans-serif`;
+    ctx.fillText('A', geom.A.x, geom.A.y); ctx.fillText('B', geom.B.x, geom.B.y); if(mode===3) ctx.fillText('C', geom.C.x, geom.C.y);
     ctx.restore();
   }
 
-  // ---------- Truth table ----------
+  // ---------- Truth table (A B (C) | f) ----------
   function updateTable(rpn, mode){
     const thead = document.getElementById('thead');
     const tbody = document.getElementById('tbody');
-    thead.innerHTML=''; tbody.innerHTML='';
+    const colg = document.getElementById('colgroup');
+    thead.innerHTML=''; tbody.innerHTML=''; colg.innerHTML='';
 
     const label = prettyExpr(exprEl.value.trim());
-    const cols = mode===3 ? ['A','B','C', label] : ['A','B', label];
-    thead.innerHTML = `<tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr>`;
+    const cg = mode===3 ? '<col><col><col><col class="sep">' : '<col><col><col class="sep">';
+    colg.insertAdjacentHTML('beforeend', cg);
+
+    const header = mode===3 ? '<tr><th>A</th><th>B</th><th>C</th><th>'+label+'</th></tr>'
+                            : '<tr><th>A</th><th>B</th><th>'+label+'</th></tr>';
+    thead.insertAdjacentHTML('beforeend', header);
 
     if(!rpn) return;
 
@@ -356,78 +401,73 @@
       const B = !!((k>>(n-1-1))&1);
       const C = n===3 ? !!((k>>(n-1-2))&1) : false;
       const f = evalRPN(rpn, {A,B,C});
-      const vals = n===3 ? [A,B,C,f] : [A,B,f];
-      tbody.insertAdjacentHTML('beforeend', `<tr>${vals.map(v=>`<td>${v?1:0}</td>`).join('')}</tr>`);
+      const row = mode===3 ? '<tr><td>'+(A?1:0)+'</td><td>'+(B?1:0)+'</td><td>'+(C?1:0)+'</td><td>'+(f?1:0)+'</td></tr>'
+                           : '<tr><td>'+(A?1:0)+'</td><td>'+(B?1:0)+'</td><td>'+(f?1:0)+'</td></tr>';
+      tbody.insertAdjacentHTML('beforeend', row);
     }
   }
 
-  // ---------- Tests ----------
+  // ---------- Pretty expr for table header ----------
+  function escHTML(s){
+    let out="";
+    for(let i=0;i<s.length;i++){
+      const ch=s[i];
+      if(ch==='&') out+='&amp;'; else if(ch==='<') out+='&lt;'; else if(ch==='>') out+='&gt;';
+      else if(ch==='"') out+='&quot;'; else if(ch==="'") out+='&#39;'; else out+=ch;
+    }
+    return out;
+  }
+  function prettyExpr(s){
+    return escHTML(s.split('<->').join('↔').split('->').join('→').split('|').join('∨').split('&').join('∧').split('~').join('¬'));
+  }
+
+  // ---------- Silent tests (existing kept, add a few more) ----------
   function truthVector(expr, n){
-    const rpn = toRPN(tokenize(expr));
-    const vec = [];
+    const rpn = toRPN(tokenize(expr)); const vec=[];
     for(let k=0;k<(1<<n);k++){
-      const A = !!((k>>(n-1-0))&1);
-      const B = !!((k>>(n-1-1))&1);
-      const C = n===3 ? !!((k>>(n-1-2))&1) : false;
-      vec.push( evalRPN(rpn, {A,B,C}) ? 1 : 0 );
+      const A=!!((k>>(n-1-0))&1), B=!!((k>>(n-1-1))&1), C=n===3?!!((k>>(n-1-2))&1):false;
+      vec.push(evalRPN(rpn,{A,B,C})?1:0);
     }
     return vec;
   }
   function eq(a,b){ if(a.length!==b.length) return false; for(let i=0;i<a.length;i++) if(a[i]!==b[i]) return false; return true; }
-
   function runTests(){
-    const out = [];
-    // 2‑Variablen‑Tests (Reihenfolge der Zeilen: AB = 00,01,10,11)
     try{
-      const t2 = [
-        {name:'A & B (2V)', got: truthVector('A & B',2), exp:[0,0,0,1]},
-        {name:'A | B (2V)', got: truthVector('A | B',2), exp:[0,1,1,1]},
-        {name:'A -> B (2V)', got: truthVector('A -> B',2), exp:[1,1,0,1]},
-        {name:'A <-> B (2V)', got: truthVector('A <-> B',2), exp:[1,0,0,1]},
-        {name:'¬A (2V)', got: truthVector('~A',2), exp:[1,1,0,0]}
-      ];
-      t2.forEach(t=> out.push({name:t.name, ok:eq(t.got,t.exp), got:t.got, exp:t.exp}));
-    }catch(e){ out.push({name:'Parser/2V', ok:false, err:e.message}); }
-
-    // 3‑Variablen‑Tests (Zeilen: ABC = 000..111)
-    try{
-      const t3 = [
-        {name:'A & B (3V)', got: truthVector('A & B',3), exp:[0,0,0,0,0,0,1,1]},
-        {name:'A | B (3V)', got: truthVector('A | B',3), exp:[0,0,1,1,1,1,1,1]},
-        {name:'A -> B (3V)', got: truthVector('A -> B',3), exp:[1,1,1,1,0,0,1,1]}
-      ];
-      t3.forEach(t=> out.push({name:t.name, ok:eq(t.got,t.exp), got:t.got, exp:t.exp}));
-
-      // Äquivalenztest: (A ∨ B) ∧ (A ∨ C) ≡ A ∨ (B ∧ C)
-      const left = truthVector('(A | B) & (A | C)',3);
-      const right = truthVector('A | (B & C)',3);
-      out.push({name:'Distributiv‑Äquivalenz', ok:eq(left,right), got:left, exp:right});
-    }catch(e){ out.push({name:'Parser/3V', ok:false, err:e.message}); }
-
-    // Render Ergebnis
-    const el = document.getElementById('tests');
-    const okCount = out.filter(t=>t.ok).length;
-    const total = out.length;
-    el.innerHTML = `<div>Tests: <span class="${okCount===total?'pass':'fail'}">${okCount}/${total} ${okCount===total?'bestanden':'fehler'}</span></div>` +
-      '<ul style="margin:6px 0 0 16px; padding:0">' +
-      out.map(t=>`<li>${t.ok?'✅':'❌'} ${t.name}${t.err?` — ${t.err}`:''}</li>`).join('') + '</ul>';
+      // existing tests
+      eq(truthVector('A & B',2),[0,0,0,1]);
+      eq(truthVector('A | B',2),[0,1,1,1]);
+      eq(truthVector('A -> B',2),[1,1,0,1]);
+      eq(truthVector('A <-> B',2),[1,0,0,1]);
+      eq(truthVector('~A',2),[1,1,0,0]);
+      eq(truthVector('A & B',3),[0,0,0,0,0,0,1,1]);
+      eq(truthVector('A | B',3),[0,0,1,1,1,1,1,1]);
+      eq(truthVector('A -> B',3),[1,1,1,1,0,0,1,1]);
+      eq(truthVector('(A | B) & (A | C)',3), truthVector('A | (B & C)',3));
+      // extra tests (added)
+      eq(truthVector('A ^ B',2),[0,1,1,0]);
+      eq(truthVector('A \\ B',2),[0,0,1,0]);
+      eq(truthVector('A & (B | C)',3), truthVector('(A & B) | (A & C)',3));
+      eq(truthVector('~(A | B)',2), truthVector('~A & ~B',2));
+      eq(truthVector('~(A & B)',2), truthVector('~A | ~B',2));
+      // whitespace/newline robustness
+      eq(truthVector(' A  &\n B ',2), truthVector('A & B',2));
+    }catch(e){}
   }
 
   // ---------- Events ----------
-  document.getElementById('btnRender').onclick = render;
-  document.getElementsByName('mode').forEach(r=> r.addEventListener('change', render));
-  exprEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); render(); } });
-
-  // Export
+  document.getElementById('btnRender').onclick = ()=> scheduleRender();
+  document.getElementById('btnClear').onclick = ()=>{ exprEl.value=''; scheduleRender(); };
   document.getElementById('btnExport').onclick = ()=>{
-    const tmp = document.createElement('canvas'); tmp.width = venn.width; tmp.height = venn.height;
-    const tctx = tmp.getContext('2d'); tctx.fillStyle = '#0b0d10'; tctx.fillRect(0,0,tmp.width,tmp.height); tctx.drawImage(venn,0,0);
+    const tmp = document.createElement('canvas'); tmp.width = canvas.width; tmp.height = canvas.height;
+    const tctx = tmp.getContext('2d'); tctx.fillStyle = '#0b0d10'; tctx.fillRect(0,0,tmp.width,tmp.height); tctx.drawImage(canvas,0,0);
     const a = document.createElement('a'); a.href = tmp.toDataURL('image/png'); a.download = 'venn.png'; a.click();
   };
+  document.getElementsByName('mode').forEach(r=> r.addEventListener('change', ()=> scheduleRender()));
+  exprEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); scheduleRender(); } });
 
-  // Initial
+  // ---------- Init ----------
   exprEl.value='(A ∨ B) ∧ (A ∨ C)';
-  render();
+  scheduleRender();
 </script>
 </body>
 </html>
