@@ -1,4 +1,4 @@
-// Parser + evaluator + silent tests (unchanged core)
+// Parser + Evaluator + Tests
 export class ParseError extends Error{ constructor(msg){ super(msg); this.name='ParseError'; } }
 export const OP = {
   NOT:{prec:5, assoc:'right', arity:1},
@@ -81,6 +81,7 @@ export function evalRPN(rpn, ctx){
   if(st.length!==1) throw new ParseError('Malformed expression');
   return !!st[0];
 }
+/* helpers for tests */
 export function truthVector(expr, n){
   const rpn=toRPN(tokenize(expr)); const vec=[];
   for(let k=0;k<(1<<n);k++){
@@ -92,7 +93,6 @@ export function truthVector(expr, n){
 export function eq(a,b){ if(a.length!==b.length) return false; for(let i=0;i<a.length;i++) if(a[i]!==b[i]) return false; return true; }
 export function runTests(){
   try{
-    // existing tests (kept)
     eq(truthVector('A & B',2),[0,0,0,1]);
     eq(truthVector('A | B',2),[0,1,1,1]);
     eq(truthVector('A -> B',2),[1,1,0,1]);
@@ -102,7 +102,6 @@ export function runTests(){
     eq(truthVector('A | B',3),[0,0,1,1,1,1,1,1]);
     eq(truthVector('A -> B',3),[1,1,1,1,0,0,1,1]);
     eq(truthVector('(A | B) & (A | C)',3), truthVector('A | (B & C)',3));
-    // extra tests
     eq(truthVector('A ^ B',2),[0,1,1,0]);
     eq(truthVector('A \\ B',2),[0,0,1,0]);
     eq(truthVector('A & (B | C)',3), truthVector('(A & B) | (A & C)',3));
