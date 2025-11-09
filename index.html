@@ -8,6 +8,7 @@
 </head>
 <body>
   <div class="cursor" id="cursor"></div>
+
   <div class="wrap">
     <div class="header">
       <div class="title">Venn Diagram Generator</div>
@@ -15,7 +16,8 @@
 
     <div class="layout">
       <div class="panel canvasWrap">
-        <canvas id="venn"></canvas>
+        <!-- no canvas; pure SVG -->
+        <svg id="vennSvg" class="vennSvg" aria-label="Venn Diagram"></svg>
       </div>
 
       <div class="panel right">
@@ -24,7 +26,7 @@
             <input id="expr" spellcheck="false" placeholder="e.g. (A ∨ B) ∧ (A ∨ C)" />
             <button class="btn primary" id="btnRender">Render</button>
             <button class="btn ghost" id="btnClear">Clear</button>
-            <button class="btn ghost" id="btnExport">PNG</button>
+            <button class="btn ghost" id="btnExport">SVG</button>
           </div>
           <div class="toggle">
             <label><input type="radio" name="mode" value="3" checked> 3 sets</label>
