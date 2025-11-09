@@ -2,6 +2,10 @@
   --bg:#0b0d10; --panel-border:rgba(255,255,255,0.09);
   --text:#e9ecf1; --sub:#a9b3c7; --neon:#00e5ff; --bad:#ff6b6b;
 }
+
+/* Cursor überall weg */
+* { cursor: none !important; }
+
 html,body{height:100%}
 body{
   margin:0;
@@ -12,10 +16,9 @@ body{
   color:var(--text);
   font: 15px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
   overflow:hidden;
-  cursor:none;
 }
 
-/* cursor */
+/* custom cursor bubble (bleibt) */
 .cursor{ position:fixed; left:0; top:0; width:18px; height:18px; border:2px solid var(--neon);
   border-radius:50%; pointer-events:none; mix-blend-mode:screen; filter:drop-shadow(0 0 6px var(--neon));
   transform:translate(-50%,-50%); z-index:9999; transition:transform .12s ease; }
@@ -33,7 +36,7 @@ body{
   position:relative; border-radius:20px;
   background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
   border:1px solid var(--panel-border);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(10px);
   box-shadow:0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
@@ -49,43 +52,99 @@ body{
 }
 
 .rightPanel{ display:flex; flex-direction:column; padding:12px; gap:10px; overflow:hidden; }
+
+/* --- Controls ------------------------------------------------------------ */
 .controls{ display:flex; flex-direction:column; gap:10px; }
 .field{ display:flex; gap:8px; align-items:center; }
+
 .field input{
   flex:1; background: rgba(255,255,255,0.05); border:1px solid var(--panel-border);
-  border-radius:14px; padding:10px 12px; color:var(--text);
-  outline:none; transition:.2s border,.2s box-shadow; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+  border-radius:16px; padding:12px 14px; color:var(--text);
+  outline:none; transition:.2s border,.2s box-shadow,.15s transform;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
 }
-.field input:focus{ border-color: rgba(0,229,255,0.4); box-shadow: 0 0 0 3px rgba(0,229,255,0.12) }
+.field input:focus{
+  border-color: rgba(0,229,255,0.45);
+  box-shadow: 0 0 0 3px rgba(0,229,255,0.14);
+  transform: translateY(-1px);
+}
 
+/* Neon-Pill Buttons (mehr Farbe, weniger Blur, animierter Hover) */
 .btn{
-  border:1px solid var(--panel-border); background:rgba(255,255,255,0.03); color:var(--text);
-  padding:8px 10px; border-radius:12px; cursor:pointer; user-select:none;
-  transition: transform .06s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease;
-  backdrop-filter: blur(8px);
+  position:relative;
+  border:1px solid rgba(255,255,255,0.12);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+  color:var(--text);
+  padding:10px 14px; border-radius:16px;
+  user-select:none; outline:none;
+  transition: transform .08s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease, filter .18s ease;
 }
-.btn:hover{ border-color: rgba(255,255,255,0.2); box-shadow: 0 0 14px rgba(0,229,255,0.10) }
-.btn:active{ transform: translateY(1px) scale(.99) }
-.btn.primary{ border-color: rgba(0,229,255,0.35); background: linear-gradient(180deg, rgba(0,229,255,0.12), rgba(0,229,255,0.07)); }
-.btn.ghost{ background: rgba(255,255,255,0.02) }
+.btn::before{
+  content:""; position:absolute; inset:-2px;
+  border-radius:18px; pointer-events:none;
+  box-shadow: 0 0 0 0 rgba(0,229,255,0.0);
+  transition: box-shadow .25s ease;
+}
+.btn:hover{ transform: translateY(-1px); border-color: rgba(0,229,255,0.35); }
+.btn:hover::before{ box-shadow: 0 0 18px 2px rgba(0,229,255,0.22); }
+.btn:active{ transform: translateY(0) scale(0.99); filter: saturate(1.2); }
+.btn.primary{
+  background:
+    radial-gradient(350px 350px at var(--mx,50%) var(--my,50%), rgba(0,229,255,0.18), rgba(0,229,255,0.00) 60%),
+    linear-gradient(180deg, rgba(0,229,255,0.16), rgba(0,229,255,0.08));
+  border-color: rgba(0,229,255,0.45);
+}
 
-.toggle{ display:flex; gap:10px; align-items:center; color:var(--sub); }
-.toggle input{ accent-color: var(--neon); }
+/* Segmented Mode Switch (2/3 sets) im Screenshot-Stil */
+.toggle{
+  display:flex; gap:10px; align-items:center; color:var(--sub); flex-wrap:wrap;
+}
+.toggle label{
+  --active:#00f39b; --activeSoft:rgba(0,243,155,0.18); --glow:rgba(0,243,155,0.28);
+  position:relative; display:inline-flex; align-items:center; gap:8px;
+  padding:10px 16px; border-radius:18px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  border:1px solid rgba(255,255,255,0.10);
+  transition: transform .08s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease, filter .2s ease;
+}
+.toggle label:nth-of-type(2){ /* orange Akzent für 2-set */
+  --active:#ff8a00; --activeSoft:rgba(255,138,0,0.18); --glow:rgba(255,138,0,0.30);
+}
+.toggle input{ display:none; }
+.toggle label:hover{ transform: translateY(-1px); border-color: rgba(255,255,255,0.22); }
+.toggle label:has(input:checked){
+  border-color: var(--active);
+  box-shadow: 0 0 18px var(--glow), inset 0 0 0 1px rgba(255,255,255,0.03);
+  color:#fff;
+  background:
+    radial-gradient(420px 420px at var(--mx,50%) var(--my,50%), var(--activeSoft), rgba(0,0,0,0) 60%),
+    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+}
 
+/* Status/Fehler */
 .status{ min-height:18px; color:var(--bad); font-size:12px; }
 
-.chips{ display:flex; flex-wrap:wrap; gap:8px; }
+/* Chips deutlich präsenter */
+.chips{ display:flex; flex-wrap:wrap; gap:10px; }
 .chip{
-  position:relative; border:1px solid rgba(0,229,255,0.24);
-  background: linear-gradient(180deg, rgba(0,229,255,0.14), rgba(0,229,255,0.06));
-  color:var(--text); padding:8px 10px; border-radius:12px; cursor:pointer;
-  box-shadow: 0 0 12px rgba(0,229,255,0.10), inset 0 0 0 1px rgba(255,255,255,0.05);
-  transition: transform .08s ease, box-shadow .2s ease, border-color .2s ease; font-weight:600; letter-spacing:.2px;
+  position:relative; border:1px solid rgba(0,229,255,0.35);
+  background:
+    radial-gradient(380px 380px at var(--mx,50%) var(--my,50%), rgba(0,229,255,0.18), rgba(0,229,255,0.05) 60%),
+    linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+  color:var(--text); padding:10px 12px; border-radius:14px; font-weight:700;
+  letter-spacing:.2px; box-shadow: 0 0 14px rgba(0,229,255,0.12), inset 0 0 0 1px rgba(255,255,255,0.05);
+  transition: transform .08s ease, box-shadow .2s ease, border-color .2s ease, filter .2s ease;
 }
-.chip:hover{ transform: translateY(-1px); box-shadow: 0 0 18px rgba(0,229,255,0.16) }
-.chip.delete{ border-color: rgba(255,107,107,0.4);
-  background: linear-gradient(180deg, rgba(255,107,107,0.18), rgba(255,107,107,0.08)); }
+.chip:hover{ transform: translateY(-1px) scale(1.02); box-shadow: 0 0 20px rgba(0,229,255,0.18); filter: saturate(1.2); }
+.chip:active{ transform: translateY(0) scale(0.99); }
+.chip.delete{
+  border-color: rgba(255,107,107,0.5);
+  background:
+    radial-gradient(380px 380px at var(--mx,50%) var(--my,50%), rgba(255,107,107,0.22), rgba(255,107,107,0.06) 60%),
+    linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+}
 
+/* Tabelle */
 .tableWrap{
   flex:1 1 auto; overflow:auto; border:1px solid var(--panel-border); border-radius:14px;
   background: rgba(255,255,255,0.03);
@@ -99,5 +158,4 @@ thead th{
 tbody td{ border-bottom:1px solid rgba(255,255,255,0.10); padding:8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace }
 tbody tr:hover{ background: rgba(0,229,255,0.06); transition:.15s background }
-
 .warn{ color:var(--bad); font-size:12px; }
