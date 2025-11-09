@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Venn‑Logik‑Generator</title>
+<title>Venn Diagramm Generator</title>
 <style>
   :root{
     --bg: #0b0d10;
@@ -28,12 +28,12 @@
   .cursor{ position: fixed; left:0; top:0; width:18px; height:18px; border:2px solid var(--neon); border-radius:50%; pointer-events:none; mix-blend-mode:screen; filter: drop-shadow(0 0 6px var(--neon)); transform: translate(-50%, -50%); z-index:9999; }
   .cursor:after{content:""; position:absolute; inset:2px; border-radius:50%; border:1px solid rgba(255,255,255,0.4);}
 
-  .wrap{ max-width:1200px; margin:40px auto; padding:0 16px;}
+  .wrap{ max-width:100%; margin:0; padding:16px; }
   .header{ display:flex; align-items:center; gap:14px; margin-bottom:14px; }
   .title{ font-size:20px; letter-spacing:.3px; font-weight:700; }
   .badge{ font-size:12px; padding:4px 8px; border:1px solid var(--panel-border); border-radius:999px; color:var(--sub); backdrop-filter: blur(8px); background: var(--panel); }
 
-  .grid{ display:grid; grid-template-columns: 1.2fr .8fr; gap:16px; }
+  .grid{ display:grid; grid-template-columns: 1fr; gap:16px; }
   @media (max-width: 980px){ .grid{ grid-template-columns:1fr; } }
 
   .card{ position:relative; background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
@@ -63,8 +63,8 @@
   .chip:hover{ border-color: rgba(255,255,255,0.35); color:var(--text); }
 
   /* canvas wrap */
-  .canvasWrap{ position:relative; border-radius:18px; overflow:hidden; border:1px solid var(--panel-border); background: rgba(10,12,16,0.7); }
-  #venn{ width:100%; height:520px; display:block; }
+  .canvasWrap{ position:relative; border-radius:18px; overflow:hidden; border:1px solid var(--panel-border); background: rgba(10,12,16,0.7); box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.03); animation: glowPulse 4s ease-in-out infinite alternate; } @keyframes glowPulse{ 0%{ box-shadow: 0 10px 30px rgba(0,0,0,0.35), 0 0 0 rgba(0,229,255,0); } 100%{ box-shadow: 0 10px 30px rgba(0,0,0,0.35), 0 0 40px rgba(0,229,255,0.12); } }
+  #venn{ width:100%; height:76vh; display:block; }
   .legend{ position:absolute; right:12px; top:12px; display:flex; gap:8px; }
   .dot{ width:10px; height:10px; border-radius:50%; box-shadow: 0 0 10px var(--neon); background: var(--neon); }
   .dot.p{ background: var(--neon2); box-shadow: 0 0 10px var(--neon2); }
@@ -86,9 +86,7 @@
 <div class="cursor" id="cursor"></div>
 <div class="wrap">
   <div class="header">
-    <div class="title">Venn‑Logik‑Generator</div>
-    <span class="badge">A/B/C • UND/ODER/NICHT/XOR/→/↔/\ Unterschied</span>
-  </div>
+    <div class="title">Venn Diagramm Generator</div>  </div>
 
   <div class="grid">
     <!-- Left: Canvas + Controls -->
@@ -96,7 +94,7 @@
       <h3>Ausdruck & Darstellung</h3>
       <div class="controls">
         <div class="input">
-          <input id="expr" spellcheck="false" placeholder="z. B. (A ∨ B) ∧ (A ∨ C) oder A\\B" />
+          <input id="expr" spellcheck="false" placeholder="z. B. (A ∨ B) ∧ (A ∨ C)" />
           <button class="btn primary" id="btnRender">Rendern</button>
           <button class="btn" id="btnExport">PNG</button>
         </div>
@@ -113,13 +111,11 @@
 
       <div class="canvasWrap">
         <canvas id="venn" width="1000" height="600"></canvas>
-        <div class="legend">
-          <div class="dot"></div><span class="note">Bereich f(x)=1</span>
+        <span class="note">Bereich f(x)=1</span>
         </div>
       </div>
 
-      <div class="foot">
-        <div class="note">Syntax: A B C, Klammern, ¬ ! ~, ∧ &, ∨ |, ^, ->, <->, \\ (Differenz). Wörter: und/oder/nicht/xor gehen auch.</div>
+      
         <div class="note">Beispiele: <span class="chip ex" data-e="A & B">A & B</span> <span class="chip ex" data-e="A | (B & ~C)">A | (B & ~C)</span> <span class="chip ex" data-e="(A -> B) & (A -> C)">(A -> B) & (A -> C)</span> <span class="chip ex" data-e="(A ∨ B) ∧ (A ∨ C)">(A ∨ B) ∧ (A ∨ C)</span> <span class="chip ex" data-e="A\\B">A\B</span></div>
       </div>
     </div>
@@ -138,10 +134,12 @@
 <script>
   // ---------- Fancy cursor ----------
   const cursor = document.getElementById('cursor');
-  window.addEventListener('mousemove', e=>{
-    cursor.style.left = e.clientX + 'px';
-    cursor.style.top  = e.clientY + 'px';
-  });
+let tx=0, ty=0, cx=0, cy=0;
+window.addEventListener('mousemove', e=>{ tx = e.clientX; ty = e.clientY; });
+function raf(){ cx += (tx - cx)*0.18; cy += (ty - cy)*0.18; cursor.style.left = cx + 'px'; cursor.style.top = cy + 'px'; requestAnimationFrame(raf); }
+raf();
+window.addEventListener('mousedown', ()=>{ cursor.style.transform = 'translate(-50%,-50%) scale(0.85)'; });
+window.addEventListener('mouseup', ()=>{ cursor.style.transform = 'translate(-50%,-50%) scale(1)'; });
 
   // ---------- UI helpers ----------
   const exprEl = document.getElementById('expr');
@@ -162,7 +160,7 @@
   const chipDefs = [
     {t:'A',v:'A'},{t:'B',v:'B'},{t:'C',v:'C'},
     {t:'(',v:'('},{t:')',v:')'},
-    {t:'¬',v:'¬'},{t:'∧',v:'∧'},{t:'∨',v:'∨'},{t:'^',v:'^'},{t:'→',v:'->'},{t:'↔',v:'<->'},{t:'A\\B',v:'A\\B'}
+    {t:'¬',v:'¬'},{t:'∧',v:'∧'},{t:'∨',v:'∨'},{t:'→',v:'->'},{t:'↔',v:'<->'}
   ];
   const chipsWrap = document.getElementById('chips');
   chipDefs.forEach(c=>{
@@ -173,8 +171,7 @@
   });
 
   // Example chips
-  document.querySelectorAll('.chip.ex').forEach(n=>{
-    n.onclick = ()=>{ exprEl.value = n.dataset.e; render(); };
+  /* example chips removed */ render(); };
   });
 
   function insertAtCursor(input, text){
@@ -182,6 +179,14 @@
     const val = input.value;
     input.value = val.slice(0,s) + text + val.slice(e);
     const p = s + text.length; input.selectionStart = input.selectionEnd = p; input.focus();
+  }
+
+  // ---------- Parser (Shunting-yard) ----------
+  function escHTML(s){ return s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[ch])); }
+  function prettyExpr(s){
+    s = s.replace(/nicht/gi,'¬').replace(/und/gi,'∧').replace(/oder/gi,'∨');
+    s = s.replace(/<->/g,'↔').replace(/->/g,'→').replace(/\|/g,'∨').replace(/&/g,'∧').replace(/~/g,'¬');
+    return escHTML(s);
   }
 
   // ---------- Parser (Shunting-yard) ----------
@@ -287,11 +292,22 @@
 
   // ---------- Geometry ----------
   function centersAndR(mode){
-    const w = venn.width, h = venn.height; // device pixels
-    if(mode===3){
-      const r = Math.min(w,h)*0.20;
-      return {r,
-        A:{x:w*0.35, y:h*0.52},
+  const w = venn.width, h = venn.height;
+  if(mode===3){
+    const r = Math.min(w,h)*0.24;
+    return { r,
+      A:{x:w*0.34, y:h*0.60},
+      B:{x:w*0.66, y:h*0.60},
+      C:{x:w*0.50, y:h*0.34}
+    };
+  } else {
+    const r = Math.min(w,h)*0.30;
+    return { r,
+      A:{x:w*0.43, y:h*0.55},
+      B:{x:w*0.57, y:h*0.55}
+    };
+  }
+},
         B:{x:w*0.65, y:h*0.52},
         C:{x:w*0.50, y:h*0.30}
       };
@@ -400,12 +416,12 @@
     // labels
     ctx.shadowBlur = 0; ctx.fillStyle = '#e9ecf1';
     ctx.font = `${18*DPR}px Inter, system-ui, sans-serif`;
-    ctx.textAlign='center'; ctx.textBaseline='bottom';
-    ctx.fillText('A', geom.A.x, geom.A.y - geom.r - 10*DPR);
-    ctx.fillText('B', geom.B.x, geom.B.y - geom.r - 10*DPR);
-    if(mode===3) ctx.fillText('C', geom.C.x, geom.C.y - geom.r - 10*DPR);
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+ctx.fillText('A', geom.A.x, geom.A.y);
+ctx.fillText('B', geom.B.x, geom.B.y);
+if(mode===3) ctx.fillText('C', geom.C.x, geom.C.y);
 
-    ctx.restore();
+ctx.restore();
   }
 
   // ---------- Truth table ----------
@@ -415,8 +431,9 @@
     thead.innerHTML = '';
     tbody.innerHTML = '';
 
-    const cols = mode===3 ? ['A','B','C','f'] : ['A','B','f'];
-    thead.innerHTML = `<tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr>`;
+    const label = prettyExpr(exprEl.value.trim());
+const cols = mode===3 ? ['A','B','C', label] : ['A','B', label];
+thead.innerHTML = `<tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr>`;
 
     if(!rpn){ return; }
 
