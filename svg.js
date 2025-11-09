@@ -1,7 +1,8 @@
-// Reines SVG: getrennte 2-Set- und 3-Set-Gruppen (keine C-Masken-Leaks im 2-Set!)
+// Reines SVG: getrennte 2-Set- und 3-Set-Gruppen
 const VBW = 1000, VBH = 700;
 const geom3 = { r: 210, A:{x:360,y:420}, B:{x:640,y:420}, C:{x:500,y:240} };
-const geom2 = { r: 230, A:{x:420,y:360}, B:{x:580,y:360} }; // leicht größer & mittiger für 2-Set
+/* 2-Set weiter auseinander + leicht größeres r, mittig */
+const geom2 = { r: 240, A:{x:360,y:360}, B:{x:640,y:360} };
 
 export function initSVG(svg){
   svg.setAttribute('viewBox', `0 0 ${VBW} ${VBH}`);
@@ -34,60 +35,39 @@ export function initSVG(svg){
     <mask id="m2minusB" maskUnits="userSpaceOnUse"><rect width="${VBW}" height="${VBH}" fill="white"/><use href="#c2B" fill="black"/></mask>
   </defs>
 
-  <!-- eigener dunkler Hintergrund, auch in Export -->
+  <!-- dunkler Export-Hintergrund -->
   <rect id="bgRect" x="0" y="0" width="${VBW}" height="${VBH}" fill="#0b0d10"/>
 
   <!-- 3-set regions -->
   <g id="regions3">
-    <!-- OUT: ~A & ~B & ~C -->
     <g id="r3OUT"><g mask="url(#m3minusA)"><g mask="url(#m3minusB)"><g mask="url(#m3minusC)">
-      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g>
-    </g>
-    <!-- A only -->
+      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g></g>
     <g id="r3A" clip-path="url(#clip3A)"><g mask="url(#m3minusB)"><g mask="url(#m3minusC)">
-      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g>
-    </g>
-    <!-- B only -->
+      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g>
     <g id="r3B" clip-path="url(#clip3B)"><g mask="url(#m3minusA)"><g mask="url(#m3minusC)">
-      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g>
-    </g>
-    <!-- C only -->
+      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g>
     <g id="r3C" clip-path="url(#clip3C)"><g mask="url(#m3minusA)"><g mask="url(#m3minusB)">
-      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g>
-    </g>
-    <!-- intersections -->
+      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g>
     <g id="r3AB"><g clip-path="url(#clip3A)"><g clip-path="url(#clip3B)"><g mask="url(#m3minusC)">
-      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g>
-    </g>
+      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g></g>
     <g id="r3AC"><g clip-path="url(#clip3A)"><g clip-path="url(#clip3C)"><g mask="url(#m3minusB)">
-      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g>
-    </g>
+      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g></g>
     <g id="r3BC"><g clip-path="url(#clip3B)"><g clip-path="url(#clip3C)"><g mask="url(#m3minusA)">
-      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g>
-    </g>
+      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g></g>
     <g id="r3ABC"><g clip-path="url(#clip3A)"><g clip-path="url(#clip3B)"><g clip-path="url(#clip3C)">
-      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g>
-    </g>
+      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g></g>
   </g>
 
-  <!-- 2-set regions (keine C-Masken) -->
+  <!-- 2-set regions (komplett getrennt, kein C-Leak) -->
   <g id="regions2" style="display:none">
-    <!-- OUT: ~A & ~B -->
     <g id="r2OUT"><g mask="url(#m2minusA)"><g mask="url(#m2minusB)">
-      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g>
-    </g>
-    <!-- A only -->
+      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g>
     <g id="r2A" clip-path="url(#clip2A)"><g mask="url(#m2minusB)">
-      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g>
-    </g>
-    <!-- B only -->
-    <g id="r2B" clip-path="url(#clip2B)"><g mask="url(#m2minusA)">
-      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g>
-    </g>
-    <!-- AB -->
-    <g id="r2AB"><g clip-path="url(#clip2A)"><g clip-path="url(#clip2B)">
       <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g>
-    </g>
+    <g id="r2B" clip-path="url(#clip2B)"><g mask="url(#m2minusA)">
+      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g>
+    <g id="r2AB"><g clip-path="url(#clip2A)"><g clip-path="url(#clip2B)">
+      <rect class="region" x="0" y="0" width="${VBW}" height="${VBH}"/></g></g></g>
   </g>
 
   <!-- outlines & labels -->
