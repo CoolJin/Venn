@@ -1,7 +1,7 @@
-import { ParseError, tokenize, toRPN, evalRPN, truthVector, eq, runTests } from './logic.js';
+import { ParseError, tokenize, toRPN, evalRPN, runTests } from './logic.js';
 import { initSVG, setMode, setRegions } from './svg.js';
 
-// cursor
+/* smooth cursor */
 const cursor = document.getElementById('cursor');
 let tx=0, ty=0, cx=0, cy=0;
 window.addEventListener('mousemove', e=>{ tx=e.clientX; ty=e.clientY; });
@@ -9,14 +9,15 @@ window.addEventListener('mousemove', e=>{ tx=e.clientX; ty=e.clientY; });
 window.addEventListener('mousedown', ()=> cursor.style.transform='translate(-50%,-50%) scale(0.86)');
 window.addEventListener('mouseup',   ()=> cursor.style.transform='translate(-50%,-50%) scale(1)');
 
-const svg = document.getElementById('vennSvg');
-initSVG(svg);
-
-// UI refs
-const exprEl = document.getElementById('expr');
-const warnC  = document.getElementById('warnC');
+const svg     = document.getElementById('vennSvg');
+const exprEl  = document.getElementById('expr');
+const warnC   = document.getElementById('warnC');
+const status  = document.getElementById('status');
 const chipsWrap = document.getElementById('chips');
 
+initSVG(svg);
+
+/* input chips */
 const chipDefs = [
   {t:'A',v:'A'},{t:'B',v:'B'},{t:'C',v:'C'},
   {t:'(',v:'('},{t:')',v:')'},
@@ -41,7 +42,7 @@ function backspaceAtCursor(input){
   if(s>0){ input.value=input.value.slice(0,s-1)+input.value.slice(s); input.selectionStart=input.selectionEnd=s-1; input.focus(); }
 }
 
-// truth table
+/* table */
 function escHTML(s){ return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;"); }
 function prettyExpr(s){ return escHTML(s.split('<->').join('↔').split('->').join('→').split('|').join('∨').split('&').join('∧').split('~').join('¬')); }
 function updateTable(rpn, mode){
@@ -53,7 +54,6 @@ function updateTable(rpn, mode){
   thead.insertAdjacentHTML('beforeend', mode===3
     ? `<tr><th>A</th><th>B</th><th>C</th><th>${label}</th></tr>`
     : `<tr><th>A</th><th>B</th><th>${label}</th></tr>`);
-
   if(!rpn) return;
   const n=mode===3?3:2, rows=1<<n;
   for(let k=0;k<rows;k++){
@@ -66,19 +66,17 @@ function updateTable(rpn, mode){
   }
 }
 
-// render
+/* regions */
 function computeRegions(rpn, mode){
   if(!rpn) return {OUT:0,A:0,B:0,C:0,AB:0,AC:0,BC:0,ABC:0};
   const v = (A,B,C)=> evalRPN(rpn,{A,B,C})?1:0;
   if(mode===2){
     return { OUT:v(0,0,0), A:v(1,0,0), B:v(0,1,0), C:0, AB:v(1,1,0), AC:0, BC:0, ABC:0 };
   }
-  return {
-    OUT:v(0,0,0), A:v(1,0,0), B:v(0,1,0), C:v(0,0,1),
-    AB:v(1,1,0), AC:v(1,0,1), BC:v(0,1,1), ABC:v(1,1,1)
-  };
+  return { OUT:v(0,0,0), A:v(1,0,0), B:v(0,1,0), C:v(0,0,1), AB:v(1,1,0), AC:v(1,0,1), BC:v(0,1,1), ABC:v(1,1,1) };
 }
 
+/* render + Fehleranzeige */
 function render(){
   const raw = exprEl.value.trim();
   const mode = +document.querySelector('input[name="mode"]:checked').value;
@@ -86,30 +84,76 @@ function render(){
   warnC.style.display = (mode===2 && /\bC\b/.test(raw)) ? 'inline' : 'none';
 
   let rpn=null;
-  try{ rpn = toRPN(tokenize(raw)); }
-  catch(e){ updateTable(null, mode); setRegions(svg, {OUT:0,A:0,B:0,C:0,AB:0,AC:0,BC:0,ABC:0}); return; }
+  try{
+    const tokens = tokenize(raw);
+    if(tokens.length===0){ status.textContent=''; setRegions(svg, computeRegions(null,mode), mode); updateTable(null, mode); return; }
+    rpn = toRPN(tokens);
+    // einfache Strukturprüfung
+    if(!rpn || !rpn.length) throw new ParseError('Empty expression');
+    status.textContent = '';
+  }catch(e){
+    status.textContent = 'Parse error: ' + (e && e.message ? e.message : 'invalid expression');
+    setRegions(svg, computeRegions(null,mode), mode);
+    updateTable(null, mode);
+    return;
+  }
 
   const active = computeRegions(rpn, mode);
-  setRegions(svg, active);
+  setRegions(svg, active, mode);
   updateTable(rpn, mode);
   runTests(); // silent
 }
 
-// events
-document.getElementById('btnRender').onclick = ()=> render();
-document.getElementById('btnClear').onclick  = ()=>{ exprEl.value=''; render(); };
-document.getElementById('btnExport').onclick = ()=>{
-  // Export as SVG (no canvas used)
+/* Export: SVG -> PNG (mit schwarzem BG). Fallback: direktes SVG */
+async function exportPNG(svgEl){
+  try{
+    const serializer = new XMLSerializer();
+    const src = serializer.serializeToString(svgEl);
+    const blob = new Blob([src], {type:'image/svg+xml;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    const w = Math.max(1, svgEl.clientWidth);
+    const h = Math.max(1, svgEl.clientHeight);
+
+    const scale = 2; // scharf genug
+    const canvas = document.createElement('canvas');
+    canvas.width = w*scale; canvas.height = h*scale;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0b0d10';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    await new Promise((res,rej)=>{ img.onload=()=>res(); img.onerror=rej; img.src=url; });
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = 'venn.png';
+    a.click();
+  }catch(_){
+    // Fallback: SVG direkt speichern
+    exportSVG(svgEl);
+  }
+}
+function exportSVG(svgEl){
   const serializer = new XMLSerializer();
-  const src = serializer.serializeToString(svg);
+  const src = serializer.serializeToString(svgEl);
   const blob = new Blob([src], {type:'image/svg+xml;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'venn.svg'; a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href), 0);
-};
+  setTimeout(()=>URL.revokeObjectURL(a.href),0);
+}
+
+/* events */
+document.getElementById('btnRender').onclick = ()=> render();
+document.getElementById('btnClear').onclick  = ()=>{ exprEl.value=''; render(); };
+document.getElementById('btnExportPng').onclick = ()=> exportPNG(svg);
+document.getElementById('btnExportSvg').onclick = ()=> exportSVG(svg);
 Array.from(document.getElementsByName('mode')).forEach(r=> r.addEventListener('change', render));
 exprEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); render(); } });
 
-// init
+/* init */
 exprEl.value='(A ∨ B) ∧ (A ∨ C)';
 render();
