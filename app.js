@@ -1,7 +1,7 @@
 import { ParseError, tokenize, toRPN, evalRPN, runTests } from './logic.js';
 import { initSVG, setMode, setRegions } from './svg.js';
 
-/* smooth cursor */
+/* smooth custom cursor (Systemcursor ist global aus) */
 const cursor = document.getElementById('cursor');
 let tx=0, ty=0, cx=0, cy=0;
 window.addEventListener('mousemove', e=>{ tx=e.clientX; ty=e.clientY; });
@@ -17,6 +17,17 @@ const chipsWrap = document.getElementById('chips');
 
 initSVG(svg);
 
+/* pointer-position für Glow (Buttons/Chips/Segs) */
+function attachPointerVars(els){
+  els.forEach(el=>{
+    el.addEventListener('pointermove', ev=>{
+      const r = el.getBoundingClientRect();
+      el.style.setProperty('--mx', `${ev.clientX - r.left}px`);
+      el.style.setProperty('--my', `${ev.clientY - r.top}px`);
+    });
+  });
+}
+
 /* input chips */
 const chipDefs = [
   {t:'A',v:'A'},{t:'B',v:'B'},{t:'C',v:'C'},
@@ -29,6 +40,11 @@ for(const c of chipDefs){
   b.onclick=()=>{ if(c.v==='__BACKSPACE__') backspaceAtCursor(exprEl); else insertAtCursor(exprEl,c.v); };
   chipsWrap.appendChild(b);
 }
+attachPointerVars([...document.querySelectorAll('.chip')]);
+
+/* enhance buttons + segmented labels with glow */
+attachPointerVars([...document.querySelectorAll('.btn, .toggle label')]);
+
 function insertAtCursor(input, text){
   const s=(input.selectionStart==null?input.value.length:input.selectionStart);
   const e=(input.selectionEnd==null?input.value.length:input.selectionEnd);
@@ -42,7 +58,7 @@ function backspaceAtCursor(input){
   if(s>0){ input.value=input.value.slice(0,s-1)+input.value.slice(s); input.selectionStart=input.selectionEnd=s-1; input.focus(); }
 }
 
-/* table */
+/* Tabelle */
 function escHTML(s){ return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;"); }
 function prettyExpr(s){ return escHTML(s.split('<->').join('↔').split('->').join('→').split('|').join('∨').split('&').join('∧').split('~').join('¬')); }
 function updateTable(rpn, mode){
@@ -66,7 +82,7 @@ function updateTable(rpn, mode){
   }
 }
 
-/* regions */
+/* Regionen */
 function computeRegions(rpn, mode){
   if(!rpn) return {OUT:0,A:0,B:0,C:0,AB:0,AC:0,BC:0,ABC:0};
   const v = (A,B,C)=> evalRPN(rpn,{A,B,C})?1:0;
@@ -76,7 +92,7 @@ function computeRegions(rpn, mode){
   return { OUT:v(0,0,0), A:v(1,0,0), B:v(0,1,0), C:v(0,0,1), AB:v(1,1,0), AC:v(1,0,1), BC:v(0,1,1), ABC:v(1,1,1) };
 }
 
-/* render + Fehleranzeige */
+/* Render + Fehler */
 function render(){
   const raw = exprEl.value.trim();
   const mode = +document.querySelector('input[name="mode"]:checked').value;
@@ -88,7 +104,6 @@ function render(){
     const tokens = tokenize(raw);
     if(tokens.length===0){ status.textContent=''; setRegions(svg, computeRegions(null,mode), mode); updateTable(null, mode); return; }
     rpn = toRPN(tokens);
-    // einfache Strukturprüfung
     if(!rpn || !rpn.length) throw new ParseError('Empty expression');
     status.textContent = '';
   }catch(e){
@@ -104,7 +119,7 @@ function render(){
   runTests(); // silent
 }
 
-/* Export: SVG -> PNG (mit schwarzem BG). Fallback: direktes SVG */
+/* Export */
 async function exportPNG(svgEl){
   try{
     const serializer = new XMLSerializer();
@@ -117,7 +132,7 @@ async function exportPNG(svgEl){
     const w = Math.max(1, svgEl.clientWidth);
     const h = Math.max(1, svgEl.clientHeight);
 
-    const scale = 2; // scharf genug
+    const scale = 2;
     const canvas = document.createElement('canvas');
     canvas.width = w*scale; canvas.height = h*scale;
     const ctx = canvas.getContext('2d');
@@ -133,7 +148,6 @@ async function exportPNG(svgEl){
     a.download = 'venn.png';
     a.click();
   }catch(_){
-    // Fallback: SVG direkt speichern
     exportSVG(svgEl);
   }
 }
