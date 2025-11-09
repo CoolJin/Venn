@@ -1,13 +1,19 @@
 import { ParseError, tokenize, toRPN, evalRPN, runTests } from './logic.js';
 import { initSVG, setMode, setRegions } from './svg.js';
 
-/* smooth custom cursor (Systemcursor ist global aus) */
+/* Custom Cursor: nur Desktop (pointer:fine) */
 const cursor = document.getElementById('cursor');
-let tx=0, ty=0, cx=0, cy=0;
-window.addEventListener('mousemove', e=>{ tx=e.clientX; ty=e.clientY; });
-(function raf(){ cx+=(tx-cx)*0.16; cy+=(ty-cy)*0.16; cursor.style.left=cx+'px'; cursor.style.top=cy+'px'; requestAnimationFrame(raf); })();
-window.addEventListener('mousedown', ()=> cursor.style.transform='translate(-50%,-50%) scale(0.86)');
-window.addEventListener('mouseup',   ()=> cursor.style.transform='translate(-50%,-50%) scale(1)');
+const hasFinePointer = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+if (hasFinePointer) {
+  let tx=0, ty=0, cx=0, cy=0;
+  window.addEventListener('mousemove', e=>{ tx=e.clientX; ty=e.clientY; });
+  (function raf(){ cx+=(tx-cx)*0.16; cy+=(ty-cy)*0.16; cursor.style.left=cx+'px'; cursor.style.top=cy+'px'; requestAnimationFrame(raf); })();
+  window.addEventListener('mousedown', ()=> cursor.style.transform='translate(-50%,-50%) scale(0.86)');
+  window.addEventListener('mouseup',   ()=> cursor.style.transform='translate(-50%,-50%) scale(1)');
+} else {
+  // Mobile: Cursor-Element ausblenden zur Sicherheit
+  if (cursor) cursor.style.display='none';
+}
 
 const svg     = document.getElementById('vennSvg');
 const exprEl  = document.getElementById('expr');
@@ -17,14 +23,19 @@ const chipsWrap = document.getElementById('chips');
 
 initSVG(svg);
 
-/* pointer-position für Glow (Buttons/Chips/Segs) */
+/* pointer glow vars (funktioniert mit Maus & Touch) */
 function attachPointerVars(els){
   els.forEach(el=>{
-    el.addEventListener('pointermove', ev=>{
+    const set = (x,y)=>{
       const r = el.getBoundingClientRect();
-      el.style.setProperty('--mx', `${ev.clientX - r.left}px`);
-      el.style.setProperty('--my', `${ev.clientY - r.top}px`);
-    });
+      el.style.setProperty('--mx', `${x - r.left}px`);
+      el.style.setProperty('--my', `${y - r.top}px`);
+    };
+    el.addEventListener('pointermove', ev=> set(ev.clientX, ev.clientY));
+    el.addEventListener('pointerdown', ev=> set(ev.clientX, ev.clientY));
+    el.addEventListener('touchstart', ev=>{
+      const t=ev.touches[0]; if(t) set(t.clientX, t.clientY);
+    }, {passive:true});
   });
 }
 
@@ -42,7 +53,7 @@ for(const c of chipDefs){
 }
 attachPointerVars([...document.querySelectorAll('.chip')]);
 
-/* enhance buttons + segmented labels with glow */
+/* Buttons & Segments mit Glow */
 attachPointerVars([...document.querySelectorAll('.btn, .toggle label')]);
 
 function insertAtCursor(input, text){
