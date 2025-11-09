@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Venn‑Logik‑Generator</title>
+<style>
+  :root{
+    --bg: #0b0d10;
+    --panel: rgba(20,22,28,0.6);
+    --panel-border: rgba(255,255,255,0.08);
+    --text: #e9ecf1;
+    --sub: #a9b3c7;
+    --neon: #00e5ff;
+    --neon2:#a855f7;
+    --good:#17e5a1;
+    --bad:#ff6b6b;
+  }
+  html,body{height:100%;}
+  body{
+    margin:0; background: radial-gradient(1200px 800px at 10% 10%, rgba(168,85,247,0.08), transparent 60%),
+                            radial-gradient(1000px 700px at 90% 80%, rgba(0,229,255,0.08), transparent 60%),
+                            var(--bg);
+    color:var(--text); font: 15px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; overflow-x:hidden;
+    cursor: none; /* custom cursor */
+  }
+  /* custom cursor */
+  .cursor{ position: fixed; left:0; top:0; width:18px; height:18px; border:2px solid var(--neon); border-radius:50%; pointer-events:none; mix-blend-mode:screen; filter: drop-shadow(0 0 6px var(--neon)); transform: translate(-50%, -50%); z-index:9999; }
+  .cursor:after{content:""; position:absolute; inset:2px; border-radius:50%; border:1px solid rgba(255,255,255,0.4);}
+
+  .wrap{ max-width:1200px; margin:40px auto; padding:0 16px;}
+  .header{ display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+  .title{ font-size:20px; letter-spacing:.3px; font-weight:700; }
+  .badge{ font-size:12px; padding:4px 8px; border:1px solid var(--panel-border); border-radius:999px; color:var(--sub); backdrop-filter: blur(8px); background: var(--panel); }
+
+  .grid{ display:grid; grid-template-columns: 1.2fr .8fr; gap:16px; }
+  @media (max-width: 980px){ .grid{ grid-template-columns:1fr; } }
+
+  .card{ position:relative; background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+         border:1px solid var(--panel-border); border-radius:22px; padding:16px; backdrop-filter: blur(12px); box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04); }
+  .card h3{ margin:4px 0 10px; font-size:14px; color:var(--sub); font-weight:600; letter-spacing:.2px; }
+
+  /* controls */
+  .controls{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px;}
+  .row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .input{ flex:1 1 460px; display:flex; align-items:center; gap:8px; }
+  .input input{ flex:1; background: rgba(255,255,255,0.04); border:1px solid var(--panel-border); border-radius:14px; padding:10px 12px; color:var(--text); outline:none; transition:.2s border;
+                box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); }
+  .input input:focus{ border-color: rgba(0,229,255,0.4); box-shadow: 0 0 0 3px rgba(0,229,255,0.12); }
+
+  .btn{ position:relative; border:1px solid var(--panel-border); background: rgba(255,255,255,0.02); color:var(--text); padding:8px 10px; border-radius:12px; cursor:pointer; user-select:none; backdrop-filter: blur(8px);
+        transition: transform .06s ease, border-color .2s ease, background .2s ease; }
+  .btn:hover{ border-color: rgba(255,255,255,0.2); }
+  .btn:active{ transform: translateY(1px) scale(.99); }
+  .btn.primary{ border-color: rgba(0,229,255,0.35); box-shadow: 0 0 16px rgba(0,229,255,0.08), inset 0 0 0 1px rgba(0,229,255,0.06);
+                background: linear-gradient(180deg, rgba(0,229,255,0.12), rgba(0,229,255,0.07)); }
+
+  .toggle{ display:flex; gap:8px; align-items:center; }
+  .toggle input{ accent-color: var(--neon); }
+
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ border:1px dashed rgba(255,255,255,0.18); border-radius:12px; padding:6px 8px; color:var(--sub); cursor:pointer; }
+  .chip:hover{ border-color: rgba(255,255,255,0.35); color:var(--text); }
+
+  /* canvas wrap */
+  .canvasWrap{ position:relative; border-radius:18px; overflow:hidden; border:1px solid var(--panel-border); background: rgba(10,12,16,0.7); }
+  #venn{ width:100%; height:520px; display:block; }
+  .legend{ position:absolute; right:12px; top:12px; display:flex; gap:8px; }
+  .dot{ width:10px; height:10px; border-radius:50%; box-shadow: 0 0 10px var(--neon); background: var(--neon); }
+  .dot.p{ background: var(--neon2); box-shadow: 0 0 10px var(--neon2); }
+
+  /* table */
+  table{ width:100%; border-collapse: collapse; }
+  thead th{ text-align:left; font-weight:700; font-size:12px; color:var(--sub); border-bottom:1px solid var(--panel-border); padding:8px; }
+  tbody td{ border-bottom:1px dashed rgba(255,255,255,0.09); padding:8px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  tbody tr:nth-child(odd){ background: rgba(255,255,255,0.02); }
+  .warn{ color:var(--bad); font-size:12px; margin-left:6px; }
+  .note{ color:var(--sub); font-size:12px; }
+
+  /* footer */
+  .foot{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin-top:10px; }
+  .kbd{ font-family: ui-monospace,Consolas,Menlo,monospace; font-size:12px; padding:2px 6px; border-radius:8px; background: rgba(255,255,255,0.06); border:1px solid var(--panel-border); }
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="wrap">
+  <div class="header">
+    <div class="title">Venn‑Logik‑Generator</div>
+    <span class="badge">A/B/C • UND/ODER/NICHT/XOR/→/↔/\ Unterschied</span>
+  </div>
+
+  <div class="grid">
+    <!-- Left: Canvas + Controls -->
+    <div class="card">
+      <h3>Ausdruck & Darstellung</h3>
+      <div class="controls">
+        <div class="input">
+          <input id="expr" spellcheck="false" placeholder="z. B. (A ∨ B) ∧ (A ∨ C) oder A\\B" />
+          <button class="btn primary" id="btnRender">Rendern</button>
+          <button class="btn" id="btnExport">PNG</button>
+        </div>
+        <div class="toggle">
+          <label><input type="radio" name="mode" value="3" checked> 3 Mengen</label>
+          <label><input type="radio" name="mode" value="2"> 2 Mengen</label>
+          <span class="warn" id="warnC" style="display:none">C wird im 2‑Mengen‑Modus ignoriert.</span>
+        </div>
+      </div>
+
+      <div class="row" style="margin-bottom:10px">
+        <div class="chips" id="chips"></div>
+      </div>
+
+      <div class="canvasWrap">
+        <canvas id="venn" width="1000" height="600"></canvas>
+        <div class="legend">
+          <div class="dot"></div><span class="note">Bereich f(x)=1</span>
+        </div>
+      </div>
+
+      <div class="foot">
+        <div class="note">Syntax: A B C, Klammern, ¬ ! ~, ∧ &, ∨ |, ^, ->, <->, \\ (Differenz). Wörter: und/oder/nicht/xor gehen auch.</div>
+        <div class="note">Beispiele: <span class="chip ex" data-e="A & B">A & B</span> <span class="chip ex" data-e="A | (B & ~C)">A | (B & ~C)</span> <span class="chip ex" data-e="(A -> B) & (A -> C)">(A -> B) & (A -> C)</span> <span class="chip ex" data-e="(A ∨ B) ∧ (A ∨ C)">(A ∨ B) ∧ (A ∨ C)</span> <span class="chip ex" data-e="A\\B">A\B</span></div>
+      </div>
+    </div>
+
+    <!-- Right: Truth Table -->
+    <div class="card">
+      <h3>Truth‑Table</h3>
+      <table>
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---------- Fancy cursor ----------
+  const cursor = document.getElementById('cursor');
+  window.addEventListener('mousemove', e=>{
+    cursor.style.left = e.clientX + 'px';
+    cursor.style.top  = e.clientY + 'px';
+  });
+
+  // ---------- UI helpers ----------
+  const exprEl = document.getElementById('expr');
+  const warnC = document.getElementById('warnC');
+  const venn = document.getElementById('venn');
+  const ctx = venn.getContext('2d');
+  const DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+
+  function resizeCanvas(){
+    const rect = venn.getBoundingClientRect();
+    venn.width  = Math.floor(rect.width * DPR);
+    venn.height = Math.floor(rect.height * DPR);
+  }
+  new ResizeObserver(resizeCanvas).observe(venn);
+  resizeCanvas();
+
+  // Insert chips
+  const chipDefs = [
+    {t:'A',v:'A'},{t:'B',v:'B'},{t:'C',v:'C'},
+    {t:'(',v:'('},{t:')',v:')'},
+    {t:'¬',v:'¬'},{t:'∧',v:'∧'},{t:'∨',v:'∨'},{t:'^',v:'^'},{t:'→',v:'->'},{t:'↔',v:'<->'},{t:'A\\B',v:'A\\B'}
+  ];
+  const chipsWrap = document.getElementById('chips');
+  chipDefs.forEach(c=>{
+    const b = document.createElement('div');
+    b.className = 'chip'; b.textContent = c.t; b.title = 'Einfügen';
+    b.onclick = ()=>insertAtCursor(exprEl, c.v);
+    chipsWrap.appendChild(b);
+  });
+
+  // Example chips
+  document.querySelectorAll('.chip.ex').forEach(n=>{
+    n.onclick = ()=>{ exprEl.value = n.dataset.e; render(); };
+  });
+
+  function insertAtCursor(input, text){
+    const [s,e] = [input.selectionStart, input.selectionEnd];
+    const val = input.value;
+    input.value = val.slice(0,s) + text + val.slice(e);
+    const p = s + text.length; input.selectionStart = input.selectionEnd = p; input.focus();
+  }
+
+  // ---------- Parser (Shunting-yard) ----------
+  class ParseError extends Error{ constructor(msg){ super(msg); this.name='ParseError'; } }
+
+  const OP = {
+    NOT: {prec:5, assoc:'right', arity:1},
+    AND: {prec:4, assoc:'left',  arity:2},
+    XOR: {prec:3, assoc:'left',  arity:2},
+    OR:  {prec:2, assoc:'left',  arity:2},
+    IMPLIES:{prec:1, assoc:'right', arity:2},
+    IFF: {prec:0, assoc:'right', arity:2},
+    DIFF:{prec:4, assoc:'left',  arity:2}
+  };
+
+  function normalizeExpr(s){
+    return s
+      .replace(/→/g,'->').replace(/↔/g,'<->')
+      .replace(/\bnicht\b/gi,'~')
+      .replace(/\bund\b/gi,'&')
+      .replace(/\boder\b/gi,'|')
+      .replace(/\bxor\b/gi,'^');
+  }
+
+  const MULTI = ['<->','->'];
+
+  function tokenize(src){
+    const s = normalizeExpr(src);
+    const tok = [];
+    let i=0;
+    while(i<s.length){
+      const ch = s[i];
+      if(/\s/.test(ch)){ i++; continue; }
+      let matched=false;
+      for(const m of MULTI){
+        if(s.startsWith(m,i)){
+          tok.push(['OP', m==='->'?'IMPLIES':'IFF']);
+          i+=m.length; matched=true; break;
+        }
+      }
+      if(matched) continue;
+      if(ch==='('){ tok.push(['LPAREN','(']); i++; continue; }
+      if(ch===')'){ tok.push(['RPAREN',')']); i++; continue; }
+      if(/[ABC]/.test(ch)){ tok.push(['VAR',ch]); i++; continue; }
+      if(ch==='¬' || ch==='!' || ch==='~'){ tok.push(['OP','NOT']); i++; continue; }
+      if(ch==='∧' || ch==='&'){ tok.push(['OP','AND']); i++; continue; }
+      if(ch==='∨' || ch==='|'){ tok.push(['OP','OR']); i++; continue; }
+      if(ch==='^' || ch==='⊕'){ tok.push(['OP','XOR']); i++; continue; }
+      if(ch==='\\'){ tok.push(['OP','DIFF']); i++; continue; }
+      throw new ParseError(`Unbekanntes Zeichen an Pos ${i}: '${ch}'`);
+    }
+    return tok;
+  }
+
+  function toRPN(tokens){
+    const out=[]; const st=[]; let prev=null;
+    for(const [tt,tv] of tokens){
+      if(tt==='VAR'){ out.push([tt,tv]); prev='VAR'; continue; }
+      if(tt==='OP'){
+        // NOT kann unär sein, Logik bleibt gleich
+        while(st.length && st[st.length-1][0]==='OP'){
+          const top = st[st.length-1][1];
+          const topI = OP[top]; const curI = OP[tv];
+          if(topI.prec>curI.prec || (topI.prec===curI.prec && curI.assoc==='left')) out.push(st.pop()); else break;
+        }
+        st.push([tt,tv]); prev='OP'; continue;
+      }
+      if(tt==='LPAREN'){ st.push([tt,tv]); prev='LPAREN'; continue; }
+      if(tt==='RPAREN'){
+        let found=false; while(st.length){ const x=st.pop(); if(x[0]==='LPAREN'){ found=true; break;} out.push(x);} if(!found) throw new ParseError('Fehlende (');
+        prev='RPAREN'; continue;
+      }
+      throw new ParseError('Tokenfehler');
+    }
+    while(st.length){ const x=st.pop(); if(x[0]==='LPAREN') throw new ParseError('Klammern nicht balanciert'); out.push(x);} 
+    return out;
+  }
+
+  function evalRPN(rpn, ctx){
+    const st=[];
+    for(const [tt,tv] of rpn){
+      if(tt==='VAR'){ st.push(!!ctx[tv]); continue; }
+      if(tt==='OP'){
+        const ar = OP[tv].arity;
+        if(ar===1){ const a = !!st.pop(); st.push(!a); continue; }
+        const b = !!st.pop(); const a = !!st.pop();
+        switch(tv){
+          case 'AND': st.push(a && b); break;
+          case 'OR': st.push(a || b); break;
+          case 'XOR': st.push((a&&!b)||(!a&&b)); break;
+          case 'IMPLIES': st.push((!a)||b); break;
+          case 'IFF': st.push((a&&b)||(!a&&!b)); break;
+          case 'DIFF': st.push(a && !b); break;
+          default: throw new ParseError('Unbekannter Operator '+tv);
+        }
+        continue;
+      }
+      throw new ParseError('RPN-Fehler');
+    }
+    if(st.length!==1) throw new ParseError('Ausdruck fehlerhaft');
+    return !!st[0];
+  }
+
+  // ---------- Geometry ----------
+  function centersAndR(mode){
+    const w = venn.width, h = venn.height; // device pixels
+    if(mode===3){
+      const r = Math.min(w,h)*0.20;
+      return {r,
+        A:{x:w*0.35, y:h*0.52},
+        B:{x:w*0.65, y:h*0.52},
+        C:{x:w*0.50, y:h*0.30}
+      };
+    } else {
+      const r = Math.min(w,h)*0.26;
+      return {r,
+        A:{x:w*0.38, y:h*0.50},
+        B:{x:w*0.62, y:h*0.50}
+      };
+    }
+  }
+
+  function inside(x,y,c,r){ const dx=x-c.x, dy=y-c.y; return dx*dx+dy*dy <= r*r; }
+
+  // ---------- Render ----------
+  let lastRpn = null, lastMode = 3;
+
+  function render(){
+    const raw = exprEl.value.trim();
+    const mode = +document.querySelector('input[name="mode"]:checked').value;
+    warnC.style.display = (mode===2 && /\bC\b/.test(raw)) ? 'inline' : 'none';
+
+    // parse
+    let rpn;
+    try{
+      rpn = toRPN(tokenize(raw));
+      lastRpn = rpn; lastMode = mode;
+    } catch(e){
+      drawBackdrop();
+      drawMessage('Parse-Fehler: '+e.message);
+      updateTable(null, mode);
+      return;
+    }
+
+    drawVenn(rpn, mode);
+    updateTable(rpn, mode);
+  }
+
+  function drawBackdrop(){
+    ctx.save();
+    ctx.clearRect(0,0,venn.width,venn.height);
+    // background glass panel
+    ctx.fillStyle = 'rgba(8,10,14,0.95)';
+    ctx.fillRect(0,0,venn.width,venn.height);
+    ctx.restore();
+  }
+
+  function drawMessage(msg){
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.roundRect?.(20*DPR,20*DPR, venn.width-40*DPR, 60*DPR, 14*DPR);
+    if(ctx.roundRect) ctx.fill();
+    ctx.fillStyle = '#e9ecf1';
+    ctx.font = `${16*DPR}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(msg, venn.width/2, 60*DPR);
+    ctx.restore();
+  }
+
+  function drawVenn(rpn, mode){
+    drawBackdrop();
+    const geom = centersAndR(mode);
+
+    // paint mask via ImageData for soft neon glow
+    const img = ctx.createImageData(venn.width, venn.height);
+    const data = img.data;
+    const r = Math.round(geom.r);
+
+    // neon color
+    const c1 = {r:0, g:229, b:255};
+
+    // iterate in full res but cheap checks: only around circles bbox
+    const minX = 0, minY = 0, maxX = venn.width, maxY = venn.height;
+
+    for(let y=minY; y<maxY; y++){
+      for(let x=minX; x<maxX; x++){
+        let A=false,B=false,C=false;
+        if(mode===3){
+          A = inside(x,y,geom.A,geom.r);
+          B = inside(x,y,geom.B,geom.r);
+          C = inside(x,y,geom.C,geom.r);
+        } else {
+          A = inside(x,y,geom.A,geom.r);
+          B = inside(x,y,geom.B,geom.r);
+        }
+        const ok = evalRPN(rpn, {A,B,C});
+        if(ok){
+          const idx = (y*venn.width + x)*4;
+          data[idx]   = c1.r;
+          data[idx+1] = c1.g;
+          data[idx+2] = c1.b;
+          data[idx+3] = 70; // alpha
+        }
+      }
+    }
+    ctx.putImageData(img,0,0);
+
+    // outline circles
+    ctx.save();
+    ctx.lineWidth = 2*DPR; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.shadowColor = 'rgba(0,229,255,0.35)'; ctx.shadowBlur = 8*DPR;
+
+    function circle(c){ ctx.beginPath(); ctx.arc(c.x,c.y,geom.r,0,Math.PI*2); ctx.stroke(); }
+    circle(geom.A); circle(geom.B); if(mode===3) circle(geom.C);
+
+    // labels
+    ctx.shadowBlur = 0; ctx.fillStyle = '#e9ecf1';
+    ctx.font = `${18*DPR}px Inter, system-ui, sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText('A', geom.A.x, geom.A.y - geom.r - 10*DPR);
+    ctx.fillText('B', geom.B.x, geom.B.y - geom.r - 10*DPR);
+    if(mode===3) ctx.fillText('C', geom.C.x, geom.C.y - geom.r - 10*DPR);
+
+    ctx.restore();
+  }
+
+  // ---------- Truth table ----------
+  function updateTable(rpn, mode){
+    const thead = document.getElementById('thead');
+    const tbody = document.getElementById('tbody');
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+
+    const cols = mode===3 ? ['A','B','C','f'] : ['A','B','f'];
+    thead.innerHTML = `<tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr>`;
+
+    if(!rpn){ return; }
+
+    const n = mode===3 ? 3 : 2;
+    const rows = 1<<n;
+    for(let k=0;k<rows;k++){
+      const A = !!((k>>(n-1-0))&1);
+      const B = !!((k>>(n-1-1))&1);
+      const C = n===3 ? !!((k>>(n-1-2))&1) : false;
+      const f = evalRPN(rpn, {A,B,C});
+      const vals = n===3 ? [A,B,C,f] : [A,B,f];
+      tbody.insertAdjacentHTML('beforeend', `<tr>${vals.map(v=>`<td>${v?1:0}</td>`).join('')}</tr>`);
+    }
+  }
+
+  // ---------- Events ----------
+  document.getElementById('btnRender').onclick = render;
+  document.getElementsByName('mode').forEach(r=> r.addEventListener('change', render));
+  exprEl.addEventListener('input', ()=>{ /* live preview but not on every keystroke heavy */ });
+
+  // Export
+  document.getElementById('btnExport').onclick = ()=>{
+    // make a temporary canvas with background
+    const tmp = document.createElement('canvas');
+    tmp.width = venn.width; tmp.height = venn.height;
+    const tctx = tmp.getContext('2d');
+    tctx.fillStyle = '#0b0d10'; tctx.fillRect(0,0,tmp.width,tmp.height);
+    tctx.drawImage(venn,0,0);
+    const url = tmp.toDataURL('image/png');
+    const a = document.createElement('a'); a.href = url; a.download = 'venn.png'; a.click();
+  };
+
+  // Initial expr
+  exprEl.value = '(A ∨ B) ∧ (A ∨ C)';
+  render();
+</script>
+</body>
+</html>
