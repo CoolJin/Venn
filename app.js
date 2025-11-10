@@ -1,17 +1,19 @@
 import { ParseError, tokenize, toRPN, evalRPN, runTests } from './logic.js';
 import { initSVG, setMode, setRegions } from './svg.js';
 
-/* Custom Cursor: nur Desktop (pointer:fine) */
+/* Pointer-Fähigkeiten */
+const mFine   = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+const mCoarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+
+/* Custom Cursor nur Desktop */
 const cursor = document.getElementById('cursor');
-const hasFinePointer = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
-if (hasFinePointer) {
+if (mFine) {
   let tx=0, ty=0, cx=0, cy=0;
   window.addEventListener('mousemove', e=>{ tx=e.clientX; ty=e.clientY; });
   (function raf(){ cx+=(tx-cx)*0.16; cy+=(ty-cy)*0.16; cursor.style.left=cx+'px'; cursor.style.top=cy+'px'; requestAnimationFrame(raf); })();
   window.addEventListener('mousedown', ()=> cursor.style.transform='translate(-50%,-50%) scale(0.86)');
   window.addEventListener('mouseup',   ()=> cursor.style.transform='translate(-50%,-50%) scale(1)');
 } else {
-  // Mobile: Cursor-Element ausblenden zur Sicherheit
   if (cursor) cursor.style.display='none';
 }
 
@@ -23,7 +25,24 @@ const chipsWrap = document.getElementById('chips');
 
 initSVG(svg);
 
-/* pointer glow vars (funktioniert mit Maus & Touch) */
+/* ---------- Mobile: Tastatur NIE öffnen ---------- */
+(function lockMobileKeyboard(){
+  if (!mCoarse) return;                         // nur auf Touch/Mobil
+  exprEl.setAttribute('readonly', 'true');      // verhindert IME
+  exprEl.setAttribute('inputmode', 'none');     // Hinweis an Browser
+  exprEl.setAttribute('aria-readonly', 'true');
+
+  // jeglichen Fokus/Ereignisse abwürgen, die Keyboard triggern könnten
+  const kill = e => { e.preventDefault(); e.stopPropagation(); };
+  ['focus','click','pointerdown','touchstart'].forEach(ev => {
+    exprEl.addEventListener(ev, kill, { passive:false });
+  });
+
+  // Cursor & Textauswahl visuell nicht stören
+  exprEl.style.caretColor = 'transparent';
+})();
+
+/* Utils: Glow-Position für Buttons/Chips/Segmente */
 function attachPointerVars(els){
   els.forEach(el=>{
     const set = (x,y)=>{
@@ -33,13 +52,11 @@ function attachPointerVars(els){
     };
     el.addEventListener('pointermove', ev=> set(ev.clientX, ev.clientY));
     el.addEventListener('pointerdown', ev=> set(ev.clientX, ev.clientY));
-    el.addEventListener('touchstart', ev=>{
-      const t=ev.touches[0]; if(t) set(t.clientX, t.clientY);
-    }, {passive:true});
+    el.addEventListener('touchstart',  ev=> { const t=ev.touches[0]; if(t) set(t.clientX, t.clientY); }, {passive:true});
   });
 }
 
-/* input chips */
+/* Chips */
 const chipDefs = [
   {t:'A',v:'A'},{t:'B',v:'B'},{t:'C',v:'C'},
   {t:'(',v:'('},{t:')',v:')'},
@@ -53,20 +70,28 @@ for(const c of chipDefs){
 }
 attachPointerVars([...document.querySelectorAll('.chip')]);
 
-/* Buttons & Segments mit Glow */
+/* Buttons & Segmented Toggle */
 attachPointerVars([...document.querySelectorAll('.btn, .toggle label')]);
 
+/* Einfügen/Backspace ohne mobile Fokus */
 function insertAtCursor(input, text){
   const s=(input.selectionStart==null?input.value.length:input.selectionStart);
   const e=(input.selectionEnd==null?input.value.length:input.selectionEnd);
   input.value = input.value.slice(0,s)+text+input.value.slice(e);
-  input.selectionStart = input.selectionEnd = s+text.length; input.focus();
+  if (mFine) { input.selectionStart = input.selectionEnd = s+text.length; input.focus(); }
 }
 function backspaceAtCursor(input){
   let s=(input.selectionStart==null?input.value.length:input.selectionStart);
   let e=(input.selectionEnd==null?input.value.length:input.selectionEnd);
-  if(s!==e){ input.value=input.value.slice(0,s)+input.value.slice(e); input.selectionStart=input.selectionEnd=s; input.focus(); return; }
-  if(s>0){ input.value=input.value.slice(0,s-1)+input.value.slice(s); input.selectionStart=input.selectionEnd=s-1; input.focus(); }
+  if(s!==e){
+    input.value=input.value.slice(0,s)+input.value.slice(e);
+    if (mFine) { input.selectionStart=input.selectionEnd=s; input.focus(); }
+    return;
+  }
+  if(s>0){
+    input.value=input.value.slice(0,s-1)+input.value.slice(s);
+    if (mFine) { input.selectionStart=input.selectionEnd=s-1; input.focus(); }
+  }
 }
 
 /* Tabelle */
